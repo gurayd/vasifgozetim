@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AKM – Personel Vasıflandırma Sistemi</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root{--bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;--border:#2a3347;--border2:#3a4a6a;--text:#e2e8f0;--text2:#8899bb;--accent:#3b82f6;--accent2:#1d4ed8;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--radius:6px;--shadow:0 4px 24px rgba(0,0,0,.4)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:230px;min-width:230px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
+.logo-badge{background:var(--accent);color:#fff;font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 8px;border-radius:3px;display:inline-block;margin-bottom:6px}
+.sidebar-logo h1{font-size:14px;font-weight:700;line-height:1.3}
+.sidebar-logo small{font-size:10px;color:var(--text2);font-family:'IBM Plex Mono',monospace}
+.sidebar-nav{padding:12px 0;flex:1}
+.nav-section{padding:8px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text2);text-transform:uppercase}
+.nav-link{display:flex;align-items:center;gap:10px;padding:9px 16px;color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;transition:all .15s;cursor:pointer;border-left:2px solid transparent}
+.nav-link:hover{color:var(--text);background:var(--bg3)}
+.nav-link.active{color:var(--accent);background:rgba(59,130,246,.08);border-left-color:var(--accent)}
+.main{margin-left:230px;flex:1;min-height:100vh}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-left .title{font-size:15px;font-weight:600}
+.topbar-left .breadcrumb{font-size:11px;color:var(--text2)}
+.content{padding:20px 24px}
+.page{display:none}.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.stat-label{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.stat-value{font-size:26px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)}
+.card-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:16px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);background:var(--bg3);border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:9px 12px;vertical-align:middle}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text2)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--accent)}
+.badge-gray{background:rgba(148,163,184,.1);color:var(--text2)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid transparent;border-radius:var(--radius);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent2)}
+.btn-outline{background:transparent;color:var(--text);border-color:var(--border2)}
+.btn-outline:hover{background:var(--bg3)}
+.btn-danger{background:transparent;color:var(--red);border-color:rgba(239,68,68,.3)}
+.btn-danger:hover{background:rgba(239,68,68,.1)}
+.btn-success{background:var(--green);color:#fff}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.form-control{padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:inherit;font-size:13px;width:100%;transition:border-color .15s}
+.form-control:focus{outline:none;border-color:var(--accent)}
+.form-control:disabled{opacity:.5;cursor:default}
+.form-control::placeholder{color:var(--text2);opacity:.5}
+select.form-control{cursor:pointer}
+textarea.form-control{resize:vertical;min-height:72px}
+.form-section{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+.form-section-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.search-box{position:relative}
+.search-box input{padding-left:32px}
+.search-box .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none;font-size:13px}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:260px;overflow-y:auto;z-index:300;display:none}
+.ac-list.show{display:block}
+.ac-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)}
+.ac-item:hover,.ac-item.focused{background:var(--bg3)}
+.ac-item .ac-code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent)}
+.ac-item .ac-name{font-size:12px;margin-top:2px}
+.tag-list{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:4px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);font-size:12px;color:var(--accent)}
+.tag-x{cursor:pointer;color:var(--text2);padding:0 2px;font-size:15px;line-height:1}
+.tag-x:hover{color:var(--red)}
+.goz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.goz-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;position:relative}
+.goz-card-add{display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px dashed var(--border2)!important;min-height:130px;color:var(--text2)}
+.goz-card-add:hover{border-color:var(--accent)!important;color:var(--accent)}
+.goz-field{margin-bottom:8px}
+.goz-field label{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:900;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:92%;max-width:680px;max-height:90vh;overflow-y:auto;transform:translateY(16px);transition:transform .2s;box-shadow:var(--shadow)}
+.modal-overlay.show .modal{transform:none}
+.modal-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:600}
+.modal-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:20px;padding:2px 6px;line-height:1}
+.modal-body{padding:18px}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+#toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;min-width:220px;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px;animation:toastIn .2s}
+@keyframes toastIn{from{opacity:0;transform:translateX(16px)}}
+.toast-ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--green)}
+.toast-err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--red)}
+.toast-info{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:var(--accent)}
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:18px}
+.tab-btn{padding:9px 16px;background:none;border:none;color:var(--text2);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-pane{display:none}.tab-pane.active{display:block}
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text2);gap:8px}
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:40px;color:var(--text2)}
+.empty-icon{font-size:28px;margin-bottom:8px}
+.drop-zone{border:2px dashed var(--border2);border-radius:8px;padding:48px;text-align:center;cursor:pointer;transition:all .2s;color:var(--text2)}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:rgba(59,130,246,.04)}
+.flex{display:flex}.gap-2{gap:8px}.gap-3{gap:12px}.items-center{align-items:center}.justify-between{justify-content:space-between}.flex-wrap{flex-wrap:wrap}
+.text-sm{font-size:12px}.text-muted{color:var(--text2)}.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
+
+/* ── VASIF CHECKBOX LIST ──────────────────────────── */
+.v-cb-item{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
+.v-cb-item:last-child{border-bottom:none}
+.v-cb-item:hover,.v-cb-item.checked{background:rgba(59,130,246,.06)}
+.v-cb-item input[type=checkbox]{margin-top:3px;flex-shrink:0}
+.v-cb-code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);margin-bottom:2px}
+.v-cb-name{font-size:12px;color:var(--text);line-height:1.4}
+/* ── EKİPMAN KARTI ────────────────────────────────── */
+.ekip-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
+.ekip-card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap}
+.ekip-card-title{display:flex;align-items:center;gap:10px;flex:1}
+.ekip-code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;white-space:nowrap}
+.ekip-name{font-size:13px;font-weight:600;color:var(--text)}
+.ekip-tabs{display:flex;border-bottom:1px solid var(--border)}
+.ekip-tab{padding:7px 14px;background:none;border:none;color:var(--text2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+.ekip-tab:hover{color:var(--text)}
+.ekip-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.ekip-body{padding:14px 16px;display:none}
+.ekip-body.active{display:block}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-badge">TS EN ISO/IEC 17020</div>
+    <h1>AKM Personel Sistemi</h1>
+    <small>A Tipi Muayene Kuruluşu</small>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Genel</div>
+    <div class="nav-link active" data-page="dashboard" onclick="goto('dashboard')"><span>⊞</span> Ana Sayfa – Şubeler</div>
+    <div class="nav-link" data-page="personel" onclick="goto('personel',{})"><span>👥</span> Tüm Personel</div>
+    <div class="nav-section">Araçlar</div>
+    <div class="nav-link" data-page="import" onclick="goto('import')"><span>⬆</span> CSV İmport</div>
+  </nav>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="title" id="tb-title">Ana Sayfa</div>
+    <div class="breadcrumb" id="tb-crumb">AKM Şubeleri</div>
+  </div>
+  <div id="tb-actions"></div>
+</div>
+<div class="content">
+
+<!-- PAGE: DASHBOARD -->
+<div id="page-dashboard" class="page active">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Toplam Şube</div><div class="stat-value" id="s-sube">18</div></div>
+    <div class="stat-card"><div class="stat-label">Toplam Personel</div><div class="stat-value" id="s-personel">0</div></div>
+    <div class="stat-card"><div class="stat-label">Aktif Personel</div><div class="stat-value" id="s-aktif">0</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">AKM Şubeleri</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ŞUBE ADI</th><th class="text-center">TEKNİK HİZMETLER</th><th class="text-center">ASPK</th><th class="text-center">ÜYE İLİŞKİLERİ</th><th class="text-center">PERSONEL</th><th>İŞLEM</th></tr></thead>
+        <tbody id="sube-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: PERSONEL LIST -->
+<div id="page-personel" class="page">
+  <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
+    <div>
+      <h2 id="p-title" style="font-size:16px;font-weight:700"></h2>
+      <div class="text-muted text-sm mt-2" id="p-count"></div>
+    </div>
+    <div class="flex gap-2 items-center flex-wrap">
+      <div class="search-box" style="position:relative">
+        <span class="si">🔍</span>
+        <input class="form-control" id="p-search" placeholder="Ada, TC, sicil no ile ara…" style="width:230px;padding-left:30px" oninput="renderPersonelTable()">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openAddPersonel()">+ Yeni Personel</button>
+      <span id="sel-count" class="text-muted text-sm"></span>
+      <button class="btn btn-outline btn-sm" id="btn-detay" disabled onclick="selAction('detay')">Detay</button>
+      <button class="btn btn-outline btn-sm" id="btn-edit" disabled onclick="selAction('edit')">Düzenle</button>
+      <button class="btn btn-primary btn-sm" id="btn-vasif" disabled onclick="selAction('vasif')">Vasıflandırma</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:34px"></th>
+          <th>ADI SOYADI</th><th>İRTİBAT ŞUBE</th><th>TEMSİLCİLİK</th>
+          <th>ODA SİCİL NO</th><th>TC KİMLİK NO</th><th>CEP TEL</th>
+          <th>E-MAİL</th><th>ÇALIŞMA DURUMU</th><th>MESLEĞİ</th><th>KURULUŞTAKİ GÖREVİ</th>
+        </tr></thead>
+        <tbody id="p-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: PERSONEL DETAY -->
+<div id="page-detay" class="page">
+  <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+    <h2 id="d-adi" style="font-size:16px;font-weight:700"></h2>
+    <div class="flex gap-2">
+      <button class="btn btn-outline btn-sm" onclick="geriGit()">← Geri</button>
+      <button class="btn btn-primary btn-sm" id="d-btn-edit" onclick="editModeOn()">Düzenle</button>
+      <button class="btn btn-success btn-sm" id="d-btn-save" style="display:none" onclick="saveDetay()">💾 Kaydet</button>
+      <button class="btn btn-danger btn-sm" onclick="deletePersonel()">Sil</button>
+    </div>
+  </div>
+  <input type="hidden" id="d-id">
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('d','bilgi')">Kişisel Bilgiler</button>
+    <button class="tab-btn" onclick="switchTab('d','sistem')">Sistem Yetkileri</button>
+    <button class="tab-btn" onclick="switchTab('d','vasif')">Vasıflandırma</button>
+  </div>
+
+  <div id="d-bilgi" class="tab-pane active">
+    <div class="form-section">
+      <div class="form-section-title">Temel Bilgiler</div>
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">ADI SOYADI *</label><input class="form-control" id="d-adi_soyadi" disabled></div>
+        <div class="form-group"><label class="form-label">İRTİBAT ŞUBE</label><select class="form-control" id="d-irtibat_sube" disabled></select></div>
+        <div class="form-group"><label class="form-label">TEMSİLCİLİK</label><input class="form-control" id="d-temsilcilik" disabled></div>
+        <div class="form-group"><label class="form-label">ODA SİCİL NO</label><input class="form-control" id="d-oda_sicil_no" disabled></div>
+        <div class="form-group"><label class="form-label">TC KİMLİK NO</label><input class="form-control" id="d-tc_kimlik_no" disabled></div>
+        <div class="form-group"><label class="form-label">DOĞUM TARİHİ</label><input class="form-control" type="date" id="d-dogum_tarihi" disabled></div>
+        <div class="form-group"><label class="form-label">KAN GRUBU</label><input class="form-control" id="d-kan_grubu" disabled></div>
+        <div class="form-group"><label class="form-label">MEZUNİYET YILI</label><input class="form-control" type="number" id="d-mezuniyet_yili" disabled></div>
+        <div class="form-group"><label class="form-label">CEP TEL</label><input class="form-control" id="d-cep_tel" disabled></div>
+        <div class="form-group"><label class="form-label">E-MAİL</label><input class="form-control" type="email" id="d-email" disabled></div>
+        <div class="form-group"><label class="form-label">MESLEĞİ</label><input class="form-control" id="d-meslegi" disabled></div>
+        <div class="form-group"><label class="form-label">KURULUŞTAKİ GÖREVİ</label>
+          <select class="form-control" id="d-kurulusdaki_gorevi" disabled>
+            <option>Muayene Personeli</option><option>Birim Sorumlu</option><option>Yönetici</option><option>Müdür</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">ÇALIŞMA DURUMU</label>
+          <select class="form-control" id="d-calisma_durumu" disabled>
+            <option>Aktif</option><option>Pasif</option><option>Askıda</option><option>İptal</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">ÇALIŞMA TÜRÜ</label>
+          <select class="form-control" id="d-calisma_turu" disabled>
+            <option>Tam Zamanlı</option><option>Yarı Zamanlı</option>
+          </select>
+        </div>
+        <div class="form-group full"><label class="form-label">AÇIKLAMA</label><textarea class="form-control" id="d-aciklama" disabled></textarea></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Sözleşme & SGK</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">AKM SÖZLEŞME TARİHİ</label><input class="form-control" type="date" id="d-akm_sozlesme_tarihi" disabled></div>
+        <div class="form-group"><label class="form-label">SGK GİRİŞ TARİHİ</label><input class="form-control" type="date" id="d-sgk_giris_tarihi" disabled></div>
+        <div class="form-group"><label class="form-label">SGK ÇIKIŞ TARİHİ</label><input class="form-control" type="date" id="d-sgk_cikis_tarihi" disabled></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Deneyim</div>
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">DAHA ÖNCE ÇALIŞTIĞI A-TİPİ KURULUŞ VE YILLAR</label><textarea class="form-control" id="d-onceki_kurulus" disabled></textarea></div>
+        <div class="form-group full"><label class="form-label">İŞ DENEYİMİ</label><textarea class="form-control" id="d-is_deneyimi" disabled></textarea></div>
+        <div class="form-group"><label class="form-label">AKREDİTE ALANDA GÖREV BİRİMİ</label><input class="form-control" id="d-sube_birimi" disabled></div>
+        <div class="form-group full"><label class="form-label">EK AÇIKLAMALAR</label><textarea class="form-control" id="d-ek_aciklama" disabled></textarea></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="d-sistem" class="tab-pane">
+    <div class="form-section"><div class="form-section-title">QDMS</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">YETKİ TARİHİ</label><input class="form-control" type="date" id="d-qdms_yetki_tarihi" disabled></div>
+      <div class="form-group"><label class="form-label">YETKİ DÜŞÜRME TARİHİ</label><input class="form-control" type="date" id="d-qdms_yetki_dusurulme_tarihi" disabled></div>
+    </div></div>
+    <div class="form-section"><div class="form-section-title">Asansör Yazılımı</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">YETKİ TARİHİ</label><input class="form-control" type="date" id="d-asansor_yazilim_yetki_tarihi" disabled></div>
+      <div class="form-group"><label class="form-label">YETKİ DÜŞÜRME TARİHİ</label><input class="form-control" type="date" id="d-asansor_yazilim_yetki_dusurulme_tarihi" disabled></div>
+    </div></div>
+    <div class="form-section"><div class="form-section-title">PK Yazılımı</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">YETKİ TARİHİ</label><input class="form-control" type="date" id="d-pk_yazilim_yetki_tarihi" disabled></div>
+      <div class="form-group"><label class="form-label">YETKİ DÜŞÜRME TARİHİ</label><input class="form-control" type="date" id="d-pk_yazilim_yetki_dusurulme_tarihi" disabled></div>
+    </div></div>
+    <div class="form-section"><div class="form-section-title">MOBİS Asansör</div><div class="form-grid">
+      <div class="form-group"><label class="form-label">YETKİ TARİHİ</label><input class="form-control" type="date" id="d-mobis_asansor_yetki_tarihi" disabled></div>
+      <div class="form-group"><label class="form-label">YETKİ DÜŞÜRME TARİHİ</label><input class="form-control" type="date" id="d-mobis_asansor_yetki_dusurulme_tarihi" disabled></div>
+    </div></div>
+  </div>
+
+  <div id="d-vasif" class="tab-pane">
+    <p class="text-muted text-sm mb-3">Bu personelin vasıflandırılmış ekipmanları, eğitim ve gözetim kayıtları</p>
+    <div id="d-vasif-cards"><div class="empty"><div class="empty-icon">📋</div><p>Henüz vasıflandırma eklenmemiş</p></div></div>
+  </div>
+</div>
+
+<!-- PAGE: VASIFLANDİRMA -->
+<div id="page-vasif" class="page">
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <h2 id="v-adi" style="font-size:16px;font-weight:700"></h2>
+      <p class="text-muted text-sm mt-2">Ekipman vasıflandırmaları</p>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="geriGit()">← Geri</button>
+  </div>
+  <div class="card mb-3">
+    <div class="card-header"><span class="card-title">Ekipman Ara &amp; Seç</span></div>
+    <div class="card-body">
+      <div id="vasif-wrap" style="max-width:580px">
+        <div class="search-box"><span class="si">🔍</span>
+          <input class="form-control" id="v-search" placeholder="Ekipman kodu veya adı yazın… (örn: kazan, asansör, vinç)" style="padding-left:30px" autocomplete="off" oninput="vasifSearch(this.value)">
+        </div>
+        <div id="v-cb-list" style="display:none;margin-top:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto"></div>
+      </div>
+      <div id="v-add-bar" style="display:none;margin-top:10px" class="flex items-center gap-2">
+        <span id="v-sel-count" class="text-muted text-sm"></span>
+        <button class="btn btn-primary btn-sm" onclick="addCheckedVasiflar()">+ Seçilenleri Ekle</button>
+        <button class="btn btn-outline btn-sm" onclick="clearVasifSearch()">Temizle</button>
+      </div>
+    </div>
+  </div>
+  <!-- Toplu işlem butonları -->
+  <div id="v-bulk-bar" style="display:none;margin-bottom:14px" class="flex items-center gap-2">
+    <span class="text-muted text-sm" id="v-bulk-info"></span>
+    <button class="btn btn-primary btn-sm" onclick="openBulkEgitimModal()">📚 Eğitim Ekle</button>
+    <button class="btn btn-outline btn-sm" onclick="openBulkGozModal()">👁 Gözetim Ekle</button>
+  </div>
+  <div id="v-ekipman-cards"></div>
+</div>
+
+<!-- PAGE: IMPORT -->
+<div id="page-import" class="page">
+  <div class="card mb-3">
+    <div class="card-header"><span class="card-title">CSV Dosyası Yükle</span></div>
+    <div class="card-body">
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('imp-file').click()" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="event.preventDefault();this.classList.remove('over');importCSV(event.dataTransfer.files[0])">
+        <div style="font-size:36px;margin-bottom:8px">📂</div>
+        <p>CSV dosyasını buraya sürükleyin veya tıklayın</p>
+        <small class="text-muted">Desteklenen: .csv (UTF-8 veya BOM)</small>
+      </div>
+      <input type="file" id="imp-file" accept=".csv" style="display:none" onchange="importCSV(this.files[0])">
+    </div>
+  </div>
+  <div class="card mb-3">
+    <div class="card-header"><span class="card-title">CSV Format Kılavuzu</span></div>
+    <div class="card-body">
+      <p class="text-muted text-sm mb-2">Personel CSV sütun adları (noktalı virgül veya virgülle ayrılabilir):</p>
+      <div style="background:var(--bg3);padding:10px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--text2);word-break:break-all">
+        adi soyadi ; sube ; tc kimlik no ; oda sicil no ; cep tel ; email ; meslek ; gorev ; durum
+      </div>
+    </div>
+  </div>
+  <div id="imp-result"></div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- MODAL: Yeni/Düzenle Personel -->
+<div class="modal-overlay" id="m-personel">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="m-p-title">Yeni Personel</span>
+      <button class="modal-close" onclick="closeModal('m-personel')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">ADI SOYADI *</label><input class="form-control" id="mp-adi_soyadi" placeholder="Ad Soyad"></div>
+        <div class="form-group"><label class="form-label">İRTİBAT ŞUBE</label><select class="form-control" id="mp-irtibat_sube"><option value="">-- Seçin --</option></select></div>
+        <div class="form-group"><label class="form-label">TEMSİLCİLİK</label><input class="form-control" id="mp-temsilcilik"></div>
+        <div class="form-group"><label class="form-label">ODA SİCİL NO</label><input class="form-control" id="mp-oda_sicil_no"></div>
+        <div class="form-group"><label class="form-label">TC KİMLİK NO</label><input class="form-control" id="mp-tc_kimlik_no"></div>
+        <div class="form-group"><label class="form-label">CEP TEL</label><input class="form-control" id="mp-cep_tel"></div>
+        <div class="form-group"><label class="form-label">E-MAİL</label><input class="form-control" type="email" id="mp-email"></div>
+        <div class="form-group"><label class="form-label">MESLEĞİ</label><input class="form-control" id="mp-meslegi"></div>
+        <div class="form-group"><label class="form-label">KURULUŞTAKİ GÖREVİ</label>
+          <select class="form-control" id="mp-kurulusdaki_gorevi"><option>Muayene Personeli</option><option>Birim Sorumlu</option><option>Yönetici</option><option>Müdür</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">ÇALIŞMA DURUMU</label>
+          <select class="form-control" id="mp-calisma_durumu"><option>Aktif</option><option>Pasif</option><option>Askıda</option><option>İptal</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('m-personel')">İptal</button>
+      <button class="btn btn-primary" onclick="savePersonel()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Eğitim -->
+<div class="modal-overlay" id="m-egitim">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Eğitim Kaydı Ekle</span><button class="modal-close" onclick="closeModal('m-egitim')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">EĞİTİM TARİHİ</label><input class="form-control" type="date" id="eg-tarih"></div>
+        <div class="form-group"><label class="form-label">EĞİTİM ALINAN YER</label><input class="form-control" id="eg-yer"></div>
+        <div class="form-group"><label class="form-label">EĞİTMEN ADI SOYADI</label><input class="form-control" id="eg-egitmen"></div>
+        <div class="form-group"><label class="form-label">VASIFLANDIRILAN YER</label><input class="form-control" id="eg-vasif_yer"></div>
+        <div class="form-group"><label class="form-label">GÖZLEMCİ ADI SOYADI</label><input class="form-control" id="eg-gozlemci"></div>
+        <div class="form-group"><label class="form-label">GÖZLEMCİ RAPOR TARİHİ</label><input class="form-control" type="date" id="eg-goz_rapor"></div>
+        <div class="form-group"><label class="form-label">BELGELENDİRME KURULU TARİHİ</label><input class="form-control" type="date" id="eg-bel_kurul"></div>
+        <div class="form-group"><label class="form-label">ATAMA TARİHİ</label><input class="form-control" type="date" id="eg-atama"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('m-egitim')">İptal</button>
+      <button class="btn btn-primary" onclick="saveEgitim()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Toplu Eğitim Ekle -->
+<div class="modal-overlay" id="m-bulk-egitim">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <span class="modal-title">📚 Eğitim Ekle</span>
+      <button class="modal-close" onclick="closeModal('m-bulk-egitim')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Hangi Ekipmanlara Uygulanacak?</div>
+        <div id="bulk-eg-ekipman-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px"></div>
+        <div class="flex gap-2 mt-2">
+          <button class="btn btn-outline btn-xs" onclick="bulkEgSelectAll(true)">Tümünü Seç</button>
+          <button class="btn btn-outline btn-xs" onclick="bulkEgSelectAll(false)">Temizle</button>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Eğitim Bilgileri</div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">EĞİTİM TARİHİ</label><input class="form-control" type="date" id="beg-tarih"></div>
+          <div class="form-group"><label class="form-label">EĞİTİM ALINAN YER</label><input class="form-control" id="beg-yer"></div>
+          <div class="form-group"><label class="form-label">EĞİTMEN ADI SOYADI</label><input class="form-control" id="beg-egitmen"></div>
+          <div class="form-group"><label class="form-label">VASIFLANDIRILAN YER</label><input class="form-control" id="beg-vasif_yer"></div>
+          <div class="form-group"><label class="form-label">GÖZLEMCİ ADI SOYADI</label><input class="form-control" id="beg-gozlemci"></div>
+          <div class="form-group"><label class="form-label">GÖZLEMCİ RAPOR TARİHİ</label><input class="form-control" type="date" id="beg-goz_rapor"></div>
+          <div class="form-group"><label class="form-label">BELGELENDİRME KURULU TARİHİ</label><input class="form-control" type="date" id="beg-bel_kurul"></div>
+          <div class="form-group"><label class="form-label">ATAMA TARİHİ</label><input class="form-control" type="date" id="beg-atama"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('m-bulk-egitim')">İptal</button>
+      <button class="btn btn-primary" onclick="saveBulkEgitim()">💾 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Toplu Gözetim Ekle -->
+<div class="modal-overlay" id="m-bulk-goz">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <span class="modal-title">👁 Gözetim Ekle</span>
+      <button class="modal-close" onclick="closeModal('m-bulk-goz')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Hangi Ekipmanlara Uygulanacak?</div>
+        <div id="bulk-gz-ekipman-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px"></div>
+        <div class="flex gap-2 mt-2">
+          <button class="btn btn-outline btn-xs" onclick="bulkGzSelectAll(true)">Tümünü Seç</button>
+          <button class="btn btn-outline btn-xs" onclick="bulkGzSelectAll(false)">Temizle</button>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title">Gözetim Bilgileri</div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">TARİH</label><input class="form-control" type="date" id="bgz-tarih"></div>
+          <div class="form-group"><label class="form-label">GÖZETMEN ADI SOYADI</label><input class="form-control" id="bgz-gozletmen"></div>
+          <div class="form-group"><label class="form-label">RAPOR NO</label><input class="form-control" id="bgz-rapor_no"></div>
+          <div class="form-group"><label class="form-label">MÜŞTERİ NO</label><input class="form-control" id="bgz-musteri_no"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('m-bulk-goz')">İptal</button>
+      <button class="btn btn-primary" onclick="saveBulkGoz()">💾 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// VERİTABANI (localStorage)
+// ══════════════════════════════════════════════════════
+const SUBELER = ['ADANA ŞUBE','ANKARA ŞUBE','ANTALYA ŞUBE','BURSA ŞUBE','DENİZLİ ŞUBE','DİYARBAKIR ŞUBE','EDİRNE ŞUBE','ESKİŞEHİR ŞUBE','GAZİANTEP ŞUBE','İSTANBUL ŞUBE','İZMİR ŞUBE','KAYSERİ ŞUBE','KOCAELİ ŞUBE','KONYA ŞUBE','MERSİN ŞUBE','SAMSUN ŞUBE','TRABZON ŞUBE','ZONGULDAK ŞUBE'];
+
+const EKIPMANLAR = [
+  {id:'D25-01',ad:'Elektrikli asansör periyodik kontrolü'},
+  {id:'D25-02',ad:'Hidrolik asansör periyodik kontrolü'},
+  {id:'D27-01',ad:'Yürüyen merdiven/bantların son muayeneleri ve periyodik muayeneleri'},
+  {id:'D21-03',ad:'Forkliftlerin (LPG) Yakıt sistemi Uygunluk Kontrolleri'},
+  {id:'D02-01',ad:'A.1. Buhar Kazanı'},
+  {id:'D02-02',ad:'A.7. Kızgın Su Kazanı'},
+  {id:'D02-03',ad:'A.4. Kızgın Yağ Kazanı'},
+  {id:'D02-04',ad:'A.2. Kalorifer/Sıcak Su Kazanı'},
+  {id:'D02-05',ad:'A.3. Ütü Kazanı'},
+  {id:'D02-06',ad:'A.6. Buharlı Pişirme Kazanı'},
+  {id:'D04-01',ad:'A.1. Endüstriyel Otoklav'},
+  {id:'D04-02',ad:'A.2. Basınçlı Hava Tankı'},
+  {id:'D04-03',ad:'A.3. Kompresör Hava Tankı'},
+  {id:'D04-04',ad:'A.4.2 Hidrofor Genleşme Tankı'},
+  {id:'D04-05',ad:'A.4.1 Genleşme Tankı'},
+  {id:'D04-06',ad:'A.5. Buhar Jeneratörü'},
+  {id:'D04-07',ad:'A.6. Boyler/Akümülasyon Tankı'},
+  {id:'D04-08',ad:'A.7. Sıvılaştırılmış Gaz Tankları'},
+  {id:'D04-09',ad:'Basınçlı kapların periyodik kontrolü (kalınlık ölçüm)'},
+  {id:'D20-01-01',ad:'A.1.1. Gezer Köprülü Vinç'},
+  {id:'D20-01-02',ad:'A.1.2. Portal Vinç'},
+  {id:'D20-01-03',ad:'A.1.3. Monoray Vinç'},
+  {id:'D20-01-04',ad:'A.1.4. Mobil Vinç'},
+  {id:'D20-01-05',ad:'A.1.6. Yükleyici Kren'},
+  {id:'D20-01-06',ad:'A.1.5. Kule Vinç'},
+  {id:'D20-02-01',ad:'A.2. Caraskal'},
+  {id:'D20-03-01',ad:'A.3.1. Yükseltilebilen Seyyar İş Platformu'},
+  {id:'D20-03-02',ad:'A.3.2. Hareket Engelliler İçin Güç Tahrikli Kaldırma Platformu'},
+  {id:'D20-03-03',ad:'A.3.3. Asılı Erişim Donanımı'},
+  {id:'D20-03-04',ad:'A.3.4. Sütunlu Çalışma Platformu'},
+  {id:'D20-04-01',ad:'A.4. Taşıt Kaldırma Donanımı'},
+  {id:'D20-04-02',ad:'A.15. Park Lifti'},
+  {id:'D20-04-03',ad:'A.6. Kriko'},
+  {id:'D20-04-04',ad:'Kuyruktan Kaldırıcılar / Rampa'},
+  {id:'D20-05-01',ad:'A.5. Servis Asansörü'},
+  {id:'D20-06-01',ad:'A.7.1. Halatlı Çektirme'},
+  {id:'D20-06-02',ad:'A.7.2. Zincirli Çektirme'},
+  {id:'D20-07-01',ad:'A.8. Transpalet'},
+  {id:'D20-07-02',ad:'A.9. İstif Makinesi'},
+  {id:'D20-07-03',ad:'A.10. Forklift'},
+  {id:'D20-07-04',ad:'A.13. Değişken Erişimli Araç'},
+  {id:'D20-08',ad:'A.14. Sabit İniş Mahalline Hizmet Veren Makine'},
+  {id:'D20-09',ad:'A.19. İnşaat Asansörü'},
+  {id:'D22',ad:'İş Makinalarının periyodik kontrolü'},
+  {id:'D23',ad:'Tankerlerin Periyodik Kontrolü'},
+  {id:'D31-01',ad:'Endüstriyel rafların periyodik kontrolleri'},
+  {id:'D31-02',ad:'Endüstriyel Kapıların Periyodik Kontrolleri'},
+  {id:'D32',ad:'Havalandırma ve Klima Tesisatı Periyodik Kontrolleri'},
+  {id:'D33',ad:'Özel Öğrenci Barınma Yurdu Periyodik Kontrolleri'},
+  {id:'D35',ad:'Yangınla mücadele ve kurtarma hizmeti araçları Periyodik Kontrolleri'},
+  {id:'D36-01',ad:'Preslerin Periyodik Kontrolleri'},
+  {id:'D36-02',ad:'Testerelerin Periyodik Kontrolleri'},
+  {id:'D36-03',ad:'Tezgahların Periyodik Kontrolleri'},
+  {id:'D37-01',ad:'Manipülatörlerin Periyodik Kontrolleri'},
+  {id:'D37-02',ad:'Uçak yer destek donanımlarının Periyodik Kontrolleri'},
+  {id:'D37-03',ad:'Sürekli taşıma donanımları (konveyörler) periyodik Kontrolleri'},
+  {id:'D37-04',ad:'Kaldırma aksesuarları ve taşıyıcıların Periyodik Kontrolleri'},
+  {id:'D37-05',ad:'Kren asansörleri Periyodik Kontrolleri'},
+  {id:'D37-06',ad:'Eğimli yük taşıma tertibatları Periyodik Kontrolleri'},
+  {id:'D37-07',ad:'Kaldırma tablalarının Periyodik Kontrolleri'},
+  {id:'D37-08',ad:'Mobil erişim ve çalışma kuleleri Periyodik Kontrolleri'},
+  {id:'D10-01-02',ad:'Seviye II – Radyografilerin değerlendirilmesi'},
+  {id:'D10-01-03',ad:'Seviye III – Radyografilerin değerlendirilmesi'},
+  {id:'D10-02-02',ad:'Seviye II – Ultrasonik muayene ve raporlama'},
+  {id:'D10-02-03',ad:'Seviye III – Ultrasonik muayene ve raporlama'},
+  {id:'D10-03-02',ad:'Seviye II – Manyetik Parçacık muayene ve raporlama'},
+  {id:'D10-03-03',ad:'Seviye III – Manyetik Parçacık muayene ve raporlama'},
+  {id:'D10-04-02',ad:'Seviye II – Sıvı Penetrant Testi ve raporlama'},
+  {id:'D10-04-03',ad:'Seviye III – Sıvı Penetrant Testi ve raporlama'},
+  {id:'D10-05-02',ad:'Seviye II – Gözle Muayene ve raporlama'},
+  {id:'D10-05-03',ad:'Seviye III – Gözle Muayene ve raporlama'},
+  {id:'D08',ad:'Kaynak yöntem onayı ve doğrulaması'},
+  {id:'D15',ad:'Çelik Yapıların imalat, montaj kontrolleri'},
+  {id:'D19',ad:'Kaynaklı imalat yeterlilik belgelendirmesi'},
+  {id:'D05',ad:'Depolama tanklarının imalat kontrolü ve belgelendirilmesi'},
+  {id:'D17',ad:'Depolama tanklarının periyodik kontrolü'},
+  {id:'D18',ad:'Muayene hizmetleri – proje kontrol ve hesapların onaylanması'},
+  {id:'D34-01',ad:'GAR AB Teknik mevzuatına göre uygunluk değerlendirmesi MODÜL B/C2'},
+  {id:'D34-02',ad:'Gaz Yakan Cihazlar – uygunluk değerlendirmesi MODÜL G/F'},
+  {id:'D34-03',ad:'Gaz Yakan Cihazlar – uygunluk değerlendirmesi MODÜL D/E'},
+  {id:'D26',ad:'İnsan taşımak Üzere Tasarımlanan Kablolu Taşıma Tesisatı periyodik kontrolleri'},
+  {id:'D24-01-01',ad:'Gaz yakan cihaz tesis yerleşimi – Ticari Tip Pişirme Cihazları'},
+  {id:'D24-01-02',ad:'Gaz yakan cihaz tesis yerleşimi – Kazan dairesi ve ısı merkezleri'},
+  {id:'D30',ad:'Doğalgaz Tesisatı Kontrolleri'},
+  {id:'D29-01',ad:'Proje ve montaj uygunluk muayenesi'},
+  {id:'D29-02',ad:'Periyodik Kontrol (D29)'},
+  {id:'D29-03',ad:'Sızdırmazlık testleri'},
+  {id:'D28-01-A1',ad:'A.1. Yağmurlama (Sprinkler) Sistemleri'},
+  {id:'D28-01-A2',ad:'A.2. Yangın Su Deposu'},
+  {id:'D28-01-A4',ad:'A.4. Yangın Hidrant Sistemi'},
+  {id:'D28-01-A5',ad:'A.5. Yangın Dolap Sistemi'},
+  {id:'D28-01-A8',ad:'A.8. Köpüklü Söndürme Sistemleri'},
+  {id:'D28-01-A9',ad:'A.9. Portatif Yangın Söndürme Tüpleri'},
+  {id:'D28-01-A11',ad:'A.11. Temiz Gazlı Otomatik Söndürme Sistemleri'},
+  {id:'D28-01-A12',ad:'A.12. CO2 Gazlı Otomatik Söndürme Sistemleri'},
+  {id:'D28-01-A13',ad:'A.13. Kuru/Sıvı Kimyevi Otomatik Söndürme Sistemleri'},
+  {id:'D28-02',ad:'A.3. Yangın Pompa İstasyonu'},
+  {id:'D28-03',ad:'A.16. Kaçış Yolu Basınçlandırma Sistemi'},
+  {id:'D28-04',ad:'A.15. Duman Tahliye Sistemleri'},
+  {id:'D09-01',ad:'Asansörler – uygunluk değerlendirmesi MODÜL H1/D/E'},
+  {id:'D09-02',ad:'Asansörler – uygunluk değerlendirmesi MODÜL B'},
+  {id:'D09-03',ad:'Asansörler – uygunluk değerlendirmesi MODÜL F/G'},
+  {id:'D18-6',ad:'CE – Asansörlerin Proje kontrol ve hesapların onaylanması'},
+  {id:'D38-01',ad:'TS EN ISO/IEC 17020 İç Denetçi'},
+  {id:'D38-02',ad:'TS EN ISO/IEC 17065 İç Denetçi'},
+  {id:'D38-03',ad:'EA 2/17 İç Denetçi'},
+];
+
+// ── DB helpers ────────────────────────────────────────────────────────
+function dbGet(key, def=[]){ try{ return JSON.parse(localStorage.getItem('akm_'+key))||def; }catch{ return def; } }
+function dbSet(key, val){ localStorage.setItem('akm_'+key, JSON.stringify(val)); }
+
+const SEED_PERSONEL = [{"id": 1, "adi_soyadi": "ERGUN ŞENGÖR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 2, "adi_soyadi": "MUSTAFA AKIŞIN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 3, "adi_soyadi": "MELEK MEŞHUR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 4, "adi_soyadi": "AHMET TEKİN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 5, "adi_soyadi": "SONER AKYILDIZ", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 6, "adi_soyadi": "ARİF SERKAN CAN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 7, "adi_soyadi": "HİKMET PEKDUR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 8, "adi_soyadi": "TURGAY ÇAM", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 9, "adi_soyadi": "VOLKAN ERDEM", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 10, "adi_soyadi": "TAYFUN AK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 11, "adi_soyadi": "FATİH EFE ÇİÇEK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 12, "adi_soyadi": "DENİZ FENER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 13, "adi_soyadi": "AYDIN RODOPLU", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 14, "adi_soyadi": "ZAFER TAŞKESEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 15, "adi_soyadi": "OZAN ŞENLİK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 16, "adi_soyadi": "HASAN YAMAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 17, "adi_soyadi": "AYBERK YILDIRIM", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 18, "adi_soyadi": "İLKER ÖZCAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 19, "adi_soyadi": "İBRAHİM KÜÇÜKAÇIL", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 20, "adi_soyadi": "ERDİNÇ KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 21, "adi_soyadi": "ZAFER TUĞCU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 22, "adi_soyadi": "MUSTAFA KARACA", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 23, "adi_soyadi": "BUKET ALEV KILIÇ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 24, "adi_soyadi": "KAAN ÖZTEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 25, "adi_soyadi": "TUNCAY KAYA", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 26, "adi_soyadi": "MUTLU TAŞTAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 27, "adi_soyadi": "ETHEM KAYHAN KAYMAKÇI", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 28, "adi_soyadi": "ÖZCAN GÜLSÜM", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 29, "adi_soyadi": "GÜLÜSTAN ÇITAK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 30, "adi_soyadi": "TANER IRMAK", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 31, "adi_soyadi": "ALPER TOPÇU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 32, "adi_soyadi": "ÖMER NACİ GÜLEN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 33, "adi_soyadi": "YUSUF BOSTAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 34, "adi_soyadi": "BORA FIRINCI", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 35, "adi_soyadi": "EMRE BAYRAT", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 36, "adi_soyadi": "MAHMUT ÖZER", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 37, "adi_soyadi": "BEKİR TUNÇ", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 38, "adi_soyadi": "ISTEPAN İLHAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 39, "adi_soyadi": "FEVZİYE DİDEM ÖZDOĞAN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 40, "adi_soyadi": "FATMA GÜNEŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 41, "adi_soyadi": "ERKAN SÜTPINAR", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 42, "adi_soyadi": "SERDAR SÖNMEZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 43, "adi_soyadi": "ERKAN TÜRKMEN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 44, "adi_soyadi": "ÖMER KOÇAĞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 45, "adi_soyadi": "HASAN KÜTÜK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 46, "adi_soyadi": "ALİ EMRAH ERDOĞAN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 47, "adi_soyadi": "HAYATİ ÇAKIR", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 48, "adi_soyadi": "ALPER TOSUN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 49, "adi_soyadi": "BURAK DEMİRCAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 50, "adi_soyadi": "DENİZ BERBEROĞLU GÜMÜŞ", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 51, "adi_soyadi": "SEMİH HAZİNECİ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 52, "adi_soyadi": "MEHMET AKCAN", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 53, "adi_soyadi": "MUSTAFA LEVENT ŞAM", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 54, "adi_soyadi": "NURİ ÇETİN", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 55, "adi_soyadi": "CAFER ARSLAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 56, "adi_soyadi": "TUNA GÖNÜLLÜ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 57, "adi_soyadi": "VOLKAN İNAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 58, "adi_soyadi": "ATİLLA ÇİÇEK", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 59, "adi_soyadi": "VEYSEL KAHRAMAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 60, "adi_soyadi": "NURİ EGEMEN YILMAZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 61, "adi_soyadi": "İLKER KÜPELİ", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 62, "adi_soyadi": "SERAP COŞKUN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 63, "adi_soyadi": "EYLEM MUTLU", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 64, "adi_soyadi": "İLYAS BATBAY", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 65, "adi_soyadi": "ESİN ERHAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 66, "adi_soyadi": "BÜLENT ÇETİNKAYA", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 67, "adi_soyadi": "NURETTİN BİLEN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 68, "adi_soyadi": "TARIK ALTUN", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 69, "adi_soyadi": "NERİMAN ŞİMŞEK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 70, "adi_soyadi": "GÜLRU TOPÇU", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 71, "adi_soyadi": "ALİ GÖKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 72, "adi_soyadi": "MEHMET KARACAOĞLU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 73, "adi_soyadi": "MERT SÜMBÜL", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 74, "adi_soyadi": "ÇİÇEK ŞİMŞEK YILDIZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 75, "adi_soyadi": "BAHRİ BUĞRA ÇEKİN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 76, "adi_soyadi": "NİYAZİ OĞUZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 77, "adi_soyadi": "BURHAN ÖZER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 78, "adi_soyadi": "OKAN SÜREN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 79, "adi_soyadi": "ÖMER AYDIN ONOVLUK", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 80, "adi_soyadi": "TOLGA SÜTEKİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 81, "adi_soyadi": "ALİ DEĞİRMEN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 82, "adi_soyadi": "KUTLU BEYAZIT", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 83, "adi_soyadi": "YÜCEL KÜRKLÜ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 84, "adi_soyadi": "ADNAN KAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 85, "adi_soyadi": "SERHAN GENÇOĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 86, "adi_soyadi": "TAYLAN BALLI", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 87, "adi_soyadi": "HAMZA YALÇIN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 88, "adi_soyadi": "FATİH ŞANLI", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 89, "adi_soyadi": "AHMET TURAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 90, "adi_soyadi": "SEYİT BİLKAY", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 91, "adi_soyadi": "GÜRAY DİNSEL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 92, "adi_soyadi": "ÇAĞRI DEMİR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 93, "adi_soyadi": "UĞUR GÖRÜŞ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 94, "adi_soyadi": "DENİZ ÇELİK", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 95, "adi_soyadi": "VELİ ÇALIŞKAN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 96, "adi_soyadi": "ŞABAN KAYA", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 97, "adi_soyadi": "SEMİH BEKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 98, "adi_soyadi": "VOLKAN BULUT", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 99, "adi_soyadi": "SÜLEYMAN ŞAFAK GÜNAY", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 100, "adi_soyadi": "SALİM AKGÜL", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 101, "adi_soyadi": "MANSUR ATAŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 102, "adi_soyadi": "HALİL MURAT KOÇAK", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 103, "adi_soyadi": "SERKAN AHMET ÇAM", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 104, "adi_soyadi": "HAKAN KÖSEOĞLU", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 105, "adi_soyadi": "RAMADAN KORKMAZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 106, "adi_soyadi": "MÜSLÜM ŞAHİN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 107, "adi_soyadi": "BURAK KIRALAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 108, "adi_soyadi": "İBRAHİM KILAVUZ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 109, "adi_soyadi": "ŞÜKRÜ TİMUR", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 110, "adi_soyadi": "GÖKHAN KÖKSAL", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 111, "adi_soyadi": "ENGİN KOYUN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 112, "adi_soyadi": "DOĞUŞ ZAFER BAĞLAMA", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 113, "adi_soyadi": "HASAN GERİLAKAN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 114, "adi_soyadi": "ONUR SARI", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 115, "adi_soyadi": "SEVDA ÖZAY ÖZER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 116, "adi_soyadi": "İSMAİL DAL", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 117, "adi_soyadi": "SAVAŞ KOCAKAYA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 118, "adi_soyadi": "HAKAN DEMİRKIR", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 119, "adi_soyadi": "TAHSİN KARAARSLAN", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 120, "adi_soyadi": "METİN ŞANAL", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 121, "adi_soyadi": "HASAN YILMAZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 122, "adi_soyadi": "OSMAN SAMET ÖZDEMİR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 123, "adi_soyadi": "BURAK DOĞAN", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 124, "adi_soyadi": "DURDU MEHMET KARADEMİR", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 125, "adi_soyadi": "ÖMER YANDO", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 126, "adi_soyadi": "ALİ CAN YOLDAŞ", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 127, "adi_soyadi": "MERT AKKOÇOĞLU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 128, "adi_soyadi": "EMRAH NALBANT", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 129, "adi_soyadi": "UMUT AYDIN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 130, "adi_soyadi": "MURAT AYDIN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 131, "adi_soyadi": "KASIM TUFAN TURAL", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 132, "adi_soyadi": "MUTLU İRFAN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 133, "adi_soyadi": "CEVDET ŞENER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 134, "adi_soyadi": "YİĞİT GÖKELMA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 135, "adi_soyadi": "BURAK GENÇ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 136, "adi_soyadi": "ATAKAN ÇOLAK", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 137, "adi_soyadi": "MAHPERİ ÖNCEL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 138, "adi_soyadi": "MEHMET SABRİ BAYSAL", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 139, "adi_soyadi": "BİLAL ALPER ÇİZMECİ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 140, "adi_soyadi": "SERCAN ZEREYALP", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 141, "adi_soyadi": "SÜHA SERGİN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 142, "adi_soyadi": "ERSİN YILDIRIM", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 143, "adi_soyadi": "ALPASLAN GÜVEN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 144, "adi_soyadi": "SERVET ÖZTÜRK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 145, "adi_soyadi": "UĞUR TOPALOĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 146, "adi_soyadi": "İBRAHİM ALİ KAYA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 147, "adi_soyadi": "ULAŞ RECEP DURBAŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 148, "adi_soyadi": "SERÇİN ÜÇKARDEŞ", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 149, "adi_soyadi": "ZEKİ ÇAVAN", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 150, "adi_soyadi": "ERDİNÇ ORTAKÇI", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 151, "adi_soyadi": "ENGİN MERİÇ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 152, "adi_soyadi": "TARIK AYZİT", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 153, "adi_soyadi": "MUHAMMET ÖZER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 154, "adi_soyadi": "İSMAİL OĞULCAN KALENDER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 155, "adi_soyadi": "CANER SOYKÖK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 156, "adi_soyadi": "HOZAN ÇETİNKAYA", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 157, "adi_soyadi": "TÜLİN DUNAY", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 158, "adi_soyadi": "İSMAİL ŞAHİN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 159, "adi_soyadi": "CAN EYRAN KÖSEOĞLU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 160, "adi_soyadi": "BEREKET BOZOĞLAN", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 161, "adi_soyadi": "SERCAN ÇAKMAK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 162, "adi_soyadi": "DORUK GÜNDOĞDU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 163, "adi_soyadi": "HASAN ALİ KOÇTÜRK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 164, "adi_soyadi": "ÖZGE ÖZTÜRK", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 165, "adi_soyadi": "YAĞIZCAN HOTAMIŞ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 166, "adi_soyadi": "BURAK CENGİZ", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 167, "adi_soyadi": "FURKAN HIZAR", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 168, "adi_soyadi": "ŞEYMA BELİNA ÖZBEK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 169, "adi_soyadi": "MEHMET ALİ ATAHAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 170, "adi_soyadi": "YUSUF KUMUŞ", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 171, "adi_soyadi": "EVREN AKYÜZ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 172, "adi_soyadi": "EGEMEN KORKMAZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 173, "adi_soyadi": "EMRAH SİNAN KOÇ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 174, "adi_soyadi": "BAYRAM ŞEKER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 175, "adi_soyadi": "DENİZ SAYGIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 176, "adi_soyadi": "AHMET BİCAN KARACA", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 177, "adi_soyadi": "COŞKUN İLTER", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 178, "adi_soyadi": "BUĞRA KAAN TOSUN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 179, "adi_soyadi": "ONUR ÖZDEMİR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 180, "adi_soyadi": "ŞABAN AKBABA", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 181, "adi_soyadi": "SERKAN KAPICI", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 182, "adi_soyadi": "SAMET DOĞAN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 183, "adi_soyadi": "BURAK AKKUŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 184, "adi_soyadi": "SELİN SİLCAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 185, "adi_soyadi": "BURCU KIRLI", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 186, "adi_soyadi": "ULAŞ KARAKAYA", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 187, "adi_soyadi": "DOĞUKAN GÖKTÜRK MEZDA", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 188, "adi_soyadi": "SEVİNÇ GÜNGÖR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 189, "adi_soyadi": "UTKU BIÇAKCI", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 190, "adi_soyadi": "HÜSEYİN KARAKURT", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 191, "adi_soyadi": "TOLGAHAN KILIÇ", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 192, "adi_soyadi": "ENGİN ÖZGÜN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 193, "adi_soyadi": "UĞUR EKTİ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 194, "adi_soyadi": "EMRE ENGÜR", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 195, "adi_soyadi": "BURAKCAN ŞIK", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 196, "adi_soyadi": "ÖMER FARUK ŞİRİN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 197, "adi_soyadi": "ÖMER TEKİNALP", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 198, "adi_soyadi": "UMUT GÜMÜŞ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 199, "adi_soyadi": "MUSTAFA ERDEM KIRAĞASI", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 200, "adi_soyadi": "ÇAĞATAY RÜŞTÜ ERTÜRK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 201, "adi_soyadi": "NURULLAH SAKA", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 202, "adi_soyadi": "GÖKHAN HÜSEYİN CİRİT", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 203, "adi_soyadi": "İHSAN KILIÇ", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 204, "adi_soyadi": "EDA ÖZDEMİR", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 205, "adi_soyadi": "ŞEYMA ŞİMŞEK AYDIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 206, "adi_soyadi": "KAAN KULAKSIZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 207, "adi_soyadi": "FIRAT ŞEKER", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 208, "adi_soyadi": "AHMET HALUK OYMAK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 209, "adi_soyadi": "KAZIM YILDIZ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 210, "adi_soyadi": "MURAT OLGUN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 211, "adi_soyadi": "FEYYAZ ZARALI", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 212, "adi_soyadi": "FİKRET GÜNDÜZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 213, "adi_soyadi": "KAYHAN ŞENÖNDER", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 214, "adi_soyadi": "ZEHRA GÜRCÜOĞLU", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 215, "adi_soyadi": "UZAY ÖZKAN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 216, "adi_soyadi": "FATİH TURAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 217, "adi_soyadi": "KEMAL GENÇ", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 218, "adi_soyadi": "FURKAN BULUT", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 219, "adi_soyadi": "MUHAMMED YILDIRIM", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 220, "adi_soyadi": "FIRAT ÇELEN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 221, "adi_soyadi": "MUSA CİVAROĞLU", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 222, "adi_soyadi": "DENİZ CAN EVRAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 223, "adi_soyadi": "ARİF KAYA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 224, "adi_soyadi": "SERCAN AYHAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 225, "adi_soyadi": "MÜCAHİD TUĞRUL GÖK", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 226, "adi_soyadi": "BERK CAN AKDEMİR", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 227, "adi_soyadi": "GÖKER GÖKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 228, "adi_soyadi": "SERMET KEMAL TİRYAKİOĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 229, "adi_soyadi": "TAYFUN BALKAYA", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 230, "adi_soyadi": "ALİ METEHAN GEÇEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 231, "adi_soyadi": "AHMET ERGÜVEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 232, "adi_soyadi": "YUSUF GÖLBAŞI", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 233, "adi_soyadi": "FERZAN DORUK AYÇİÇEK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 234, "adi_soyadi": "MUSTAFA BOZDAĞ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 235, "adi_soyadi": "YALÇIN DERELİ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 236, "adi_soyadi": "DOĞAN KILIÇ", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 237, "adi_soyadi": "ALİ SEÇKİN KILIÇ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 238, "adi_soyadi": "BEYZA BEHLÜL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 239, "adi_soyadi": "BURAK HAMDİ TAŞKIRAN", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 240, "adi_soyadi": "CİHAN DOMBAYCI", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 241, "adi_soyadi": "TUNCER GÜL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 242, "adi_soyadi": "KAMİL YAPAR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 243, "adi_soyadi": "BUSE KURU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 244, "adi_soyadi": "ENES ÇAVUŞLAR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 245, "adi_soyadi": "MEHMET ŞİMŞEK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 246, "adi_soyadi": "ŞAFAK YALÇIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 247, "adi_soyadi": "NECMİ VARLIK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 248, "adi_soyadi": "PELİN EREN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 249, "adi_soyadi": "BERKAN SÖNMEZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 250, "adi_soyadi": "HÜSEYİN ALAŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 251, "adi_soyadi": "BURHAN KESKİN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 252, "adi_soyadi": "BARAN ÖNCAN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 253, "adi_soyadi": "HÜSEYİN BAYRAKTAR", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 254, "adi_soyadi": "BURAK YILDIZ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 255, "adi_soyadi": "ADEM KARAMAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 256, "adi_soyadi": "ALİ ONUR TEKİN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 257, "adi_soyadi": "SERCAN ÖZER", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 258, "adi_soyadi": "KADİRCAN GÖK", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 259, "adi_soyadi": "SULTAN KANAT", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 260, "adi_soyadi": "FATİH SÖNMEZ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 261, "adi_soyadi": "VOLKAN CANAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 262, "adi_soyadi": "UFUK KARABACAK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 263, "adi_soyadi": "ANIL KOÇ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 264, "adi_soyadi": "AYBERK YILMAZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 265, "adi_soyadi": "TAYLAN KARASOY", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 266, "adi_soyadi": "BÜLENT GÖKSÜLÜK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 267, "adi_soyadi": "UMUT CAN MEŞELİ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 268, "adi_soyadi": "AHMET ARMAĞAN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 269, "adi_soyadi": "UĞUR ZAL", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 270, "adi_soyadi": "SONER OĞULCAN ALAN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 271, "adi_soyadi": "SERDAR ÖZBEK", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 272, "adi_soyadi": "ALP KOCAOĞLU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 273, "adi_soyadi": "UĞUR GÜMÜŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 274, "adi_soyadi": "ÖMER ÖNDER", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 275, "adi_soyadi": "AYŞENUR DEMİRCAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 276, "adi_soyadi": "SİNAN ÖNGÖR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 277, "adi_soyadi": "ÇAĞLAR BEYDOĞAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 278, "adi_soyadi": "AHMET CAN URA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 279, "adi_soyadi": "UGUR ÇITRIK", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 280, "adi_soyadi": "VOLKAN ÇALIŞKAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 281, "adi_soyadi": "SALİH KAPANŞAHİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 282, "adi_soyadi": "ALİ CEM TERCANLI", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 283, "adi_soyadi": "ERDEM BERKAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 284, "adi_soyadi": "EREN DENİZ KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 285, "adi_soyadi": "SERCAN ALÇINKAYA", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 286, "adi_soyadi": "ABDULLAH TURAN KOŞAN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 287, "adi_soyadi": "MUSTAFA KAAN DÜLGER", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 288, "adi_soyadi": "MEHMET ALİ AKGÜL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 289, "adi_soyadi": "ALİ ARAP", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 290, "adi_soyadi": "SİNAN KARAKAYA", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 291, "adi_soyadi": "HAKAN GENÇOĞLU", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 292, "adi_soyadi": "GÖKHAN GÜL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 293, "adi_soyadi": "SEZER KÜÇÜK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 294, "adi_soyadi": "AHMET BATUHAN CEM AKAR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 295, "adi_soyadi": "TUNAHAN SEMİZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 296, "adi_soyadi": "MUHAMMED MUSTAFA ATMACA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 297, "adi_soyadi": "ZEYNEP LİZGE EVCİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 298, "adi_soyadi": "EZGİ MASTAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 299, "adi_soyadi": "BAHAR ÜSTÜNER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 300, "adi_soyadi": "AZİZ SAFİ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 301, "adi_soyadi": "ALİ UĞURALP SINMAZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 302, "adi_soyadi": "HÜSNÜCAN KILINÇ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 303, "adi_soyadi": "ANIL YÖRÜMEZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 304, "adi_soyadi": "ALİ AYDIN CAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 305, "adi_soyadi": "TANER YILMAZ", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 306, "adi_soyadi": "EMRE KUŞCU", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 307, "adi_soyadi": "KEREM TINKIR", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 308, "adi_soyadi": "AYHAN DEMİR", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 309, "adi_soyadi": "FATİH BÜYÜKYILMAZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 310, "adi_soyadi": "AHMET EMİN GEYİK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 311, "adi_soyadi": "SAMET ALTIN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 312, "adi_soyadi": "FARUK ARSLAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 313, "adi_soyadi": "MUHAMMED VEYSİ ÇELİK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 314, "adi_soyadi": "KEMAL AKGÜN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 315, "adi_soyadi": "ALPER İYİSEN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 316, "adi_soyadi": "ÇAĞATAY ALPARSLAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 317, "adi_soyadi": "OLCAY SUCUK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 318, "adi_soyadi": "MUSTAFA MELİH YÜKSEKTEPE", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 319, "adi_soyadi": "EMRE YALÇIN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 320, "adi_soyadi": "FERİT KOPARIR", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 321, "adi_soyadi": "MİNE PINAR İLHAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 322, "adi_soyadi": "ESİN KARACA MANSUROĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 323, "adi_soyadi": "ÖMER ŞAHAN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 324, "adi_soyadi": "ABDULLAH ŞENGÖR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 325, "adi_soyadi": "OZAN DENİZ KARADAĞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 326, "adi_soyadi": "HASAN KARAÇELİK", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 327, "adi_soyadi": "NUR SENA DURMAZ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 328, "adi_soyadi": "AHMET UYSAL", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 329, "adi_soyadi": "CAN SAYIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 330, "adi_soyadi": "YUNUSCAN TOPALOĞLU", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 331, "adi_soyadi": "ALİ BALCI", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 332, "adi_soyadi": "BAHAR SULTAN AYDINER", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 333, "adi_soyadi": "HATİCE NARİN İŞLER", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 334, "adi_soyadi": "BARIŞ ŞEKEROL", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 335, "adi_soyadi": "İSMAİL AKÇAY", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 336, "adi_soyadi": "HANDE ER YEŞİLDAĞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 337, "adi_soyadi": "MERT SEFA BAYAM", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 338, "adi_soyadi": "EBRU METİN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 339, "adi_soyadi": "BURAK CEVİZLİ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 340, "adi_soyadi": "SİBEL DİŞLİ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 341, "adi_soyadi": "SİNAN BAKIN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 342, "adi_soyadi": "BERK AKKIZ", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 343, "adi_soyadi": "HAKAN BAYRAM", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 344, "adi_soyadi": "BARIŞ TOPAÇ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 345, "adi_soyadi": "NAİL KÖRPE", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 346, "adi_soyadi": "MİRAÇ ŞAHİN", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 347, "adi_soyadi": "OSMAN KÖSE", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 348, "adi_soyadi": "ENES CAN", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 349, "adi_soyadi": "SÜLEYMAN HİLMİ DUT", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 350, "adi_soyadi": "ALİ KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 351, "adi_soyadi": "ARMAN KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 352, "adi_soyadi": "FIRAT GELDİ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 353, "adi_soyadi": "FURKAN ÜNAL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 354, "adi_soyadi": "OLCAY GÜRBÜZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 355, "adi_soyadi": "ÖZGÜL KIRATLI", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 356, "adi_soyadi": "UFUK ÇELİK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 357, "adi_soyadi": "BATUHAN TAŞÇI", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 358, "adi_soyadi": "SELAHATTİN ALP GÜNAYDIN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 359, "adi_soyadi": "ONUR ÖĞÜL", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 360, "adi_soyadi": "FURKAN ORHAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 361, "adi_soyadi": "ŞERVAN KÜREKEN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 362, "adi_soyadi": "ÖMER FARUK DEMİRBÜKEN", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 363, "adi_soyadi": "CAN TAMER SAYLAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 364, "adi_soyadi": "FURKAN YARDIMCI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 365, "adi_soyadi": "HASAN SEMİH DOĞAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 366, "adi_soyadi": "YASİN MERT DABANLI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 367, "adi_soyadi": "TOLGA KARAKUZU", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 368, "adi_soyadi": "EZGİ SERT", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 369, "adi_soyadi": "OĞUZ DESTAN MEŞE", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 370, "adi_soyadi": "ORKUN DURUKAN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 371, "adi_soyadi": "ALİ EFE GENCER", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 372, "adi_soyadi": "BURAK YILMAZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 373, "adi_soyadi": "HÜSEYİNCAN ÖZDEMİR", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 374, "adi_soyadi": "MEHMET ALİ YILDIRIM", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 375, "adi_soyadi": "OZAN ÇEVİK", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 376, "adi_soyadi": "ŞAHİN VURAL KON", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 377, "adi_soyadi": "MELİH ADIGÜZEL", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 378, "adi_soyadi": "ATAKAN ATAOĞLU", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 379, "adi_soyadi": "ÇEGAVERA ŞIK", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 380, "adi_soyadi": "BERKE ARDA SAY", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 381, "adi_soyadi": "NURKAN TOSUN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 382, "adi_soyadi": "HALİT ORÇUN TURAN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 383, "adi_soyadi": "HASRET GÖRKEM DELİKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 384, "adi_soyadi": "SONAY USTABAŞ YILMAZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 385, "adi_soyadi": "EMRE KISA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 386, "adi_soyadi": "İSMAİL CAN AKTAŞLI", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 387, "adi_soyadi": "ENİS YILMAZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 388, "adi_soyadi": "YUNUS SAMET YILMAZ", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 389, "adi_soyadi": "BULUT TEKE", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 390, "adi_soyadi": "KARDELEN DEMİRTAŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 391, "adi_soyadi": "ÜNAL BİRKAN ALTUN", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 392, "adi_soyadi": "MEHMET ROJ BARAN ÇELİK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 393, "adi_soyadi": "KAANHAN DURAK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 394, "adi_soyadi": "BARIŞ ELİBÜYÜK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 395, "adi_soyadi": "MERT KARAOĞLU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 396, "adi_soyadi": "ONUR ÖZBEK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 397, "adi_soyadi": "YİĞİT ERDOĞAN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 398, "adi_soyadi": "SAMET ALKAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 399, "adi_soyadi": "MERT AVŞAR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 400, "adi_soyadi": "HÜSEYİN MERT SARIKAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 401, "adi_soyadi": "ATILIM KABADAYI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 402, "adi_soyadi": "ŞİLEM BALKIS", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 403, "adi_soyadi": "KARAHAN ŞENSOY", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 404, "adi_soyadi": "HALİS CAN SALTAN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 405, "adi_soyadi": "İBRAHİM AKIŞ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 406, "adi_soyadi": "SEDANUR COŞKUN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 407, "adi_soyadi": "BEKİR KALENDER", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 408, "adi_soyadi": "NESLİHAN PAKMA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 409, "adi_soyadi": "METEHAN SAKARYA", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 410, "adi_soyadi": "MUSTAFA AYDIN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 411, "adi_soyadi": "MEHMET NURİ ÖZMEN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 412, "adi_soyadi": "ÇAĞDAŞ UÇAR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 413, "adi_soyadi": "MUSTAFA BERK BÜYÜKBAŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 414, "adi_soyadi": "AHMET OĞUZ AKÇA", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 415, "adi_soyadi": "SAMET ARSLAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 416, "adi_soyadi": "DİDEM ŞAHİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 417, "adi_soyadi": "MERT SARIGÜL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 418, "adi_soyadi": "BARAN KAYA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 419, "adi_soyadi": "HÜSEYİN CANER KARADİŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 420, "adi_soyadi": "YUNUS EMRE DEMİREL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 421, "adi_soyadi": "MURAT CAN ARAS", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 422, "adi_soyadi": "HATİP BARAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 423, "adi_soyadi": "HAMZA ÖNEN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 424, "adi_soyadi": "ALEYNA EDA AKSOY", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 425, "adi_soyadi": "ONUR ERSÖZ MERCAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 426, "adi_soyadi": "DOĞUKAN TEMEL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 427, "adi_soyadi": "ASIM CAN LEKESİZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 428, "adi_soyadi": "HALİL KIZILAĞAÇ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 429, "adi_soyadi": "SEMİH SAĞLAM", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 430, "adi_soyadi": "UFUK KIZILKAYA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 431, "adi_soyadi": "EMRE KILIÇ", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 432, "adi_soyadi": "CAN FERHAN KALAYCI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 433, "adi_soyadi": "BERFİN ACAR", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 434, "adi_soyadi": "SERHAT YILDIRIM", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 435, "adi_soyadi": "UMUTCAN USLU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 436, "adi_soyadi": "EMİRCAN GÜL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 437, "adi_soyadi": "SERHAT DEĞERMENCİ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 438, "adi_soyadi": "KEMAL ULAŞ GÖLPUNAR", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 439, "adi_soyadi": "ROHAT ALİŞ AYAS", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 440, "adi_soyadi": "ALPEREN CORUK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 441, "adi_soyadi": "TARIK ÖZDEMİR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}];
+
+function initDB(){
+  if(!localStorage.getItem('akm_inited')){
+    dbSet('personel', SEED_PERSONEL);
+    dbSet('vasiflandirmalar', []);
+    dbSet('egitimler', []);
+    dbSet('gozetimler', []);
+    dbSet('nextid', 491);
+    localStorage.setItem('akm_inited','1');
+  }
+}
+
+function nextId(){ const n=dbGet('nextid',1); dbSet('nextid', n+1); return n; }
+
+// ── ROUTING ───────────────────────────────────────────────────────────
+let _page = 'dashboard';
+let _params = {};
+let _prevPage = null;
+let _prevParams = {};
+
+function goto(page, params={}){
+  _prevPage = _page; _prevParams = _params;
+  _page = page; _params = params;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  const el = document.getElementById('page-'+page) || document.getElementById('page-'+{detay:'detay',vasif:'vasif'}[page]||page);
+  if(el) el.classList.add('active');
+  document.querySelector(`.nav-link[data-page="${page}"]`)?.classList.add('active');
+  const h = {dashboard:showDashboard, personel:()=>showPersonel(params), detay:()=>showDetay(params.id,params.mode), vasif:()=>showVasif(params.id), import:showImport};
+  h[page]?.();
+}
+
+function geriGit(){
+  if(_prevPage) goto(_prevPage, _prevParams);
+  else goto('personel',{});
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+function toast(msg, type='ok'){
+  const w=document.getElementById('toast-wrap');
+  const t=document.createElement('div');
+  t.className=`toast toast-${type}`;
+  t.innerHTML=`<span>${{ok:'✓',err:'✕',info:'ℹ'}[type]||'ℹ'}</span><span>${msg}</span>`;
+  w.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────
+function openModal(id){ document.getElementById(id)?.classList.add('show'); }
+function closeModal(id){ document.getElementById(id)?.classList.remove('show'); }
+document.addEventListener('click', e=>{
+  if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('show');
+});
+
+// ── TABS ──────────────────────────────────────────────────────────────
+function switchTab(group, tab){
+  const allIds = {d:['bilgi','sistem','vasif']};
+  const ids = allIds[group]||[];
+  ids.forEach(id=>{
+    const p=document.getElementById(`${group}-${id}`);
+    if(p) p.classList.toggle('active', id===tab);
+  });
+  const btns = document.querySelectorAll(`#page-detay .tab-btn`);
+  btns.forEach((b,i)=>b.classList.toggle('active', ids[i]===tab));
+  if(group==='d' && tab==='vasif') renderDetayVasiflar();
+}
+
+// ══════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════
+function showDashboard(){
+  document.getElementById('tb-title').textContent='Ana Sayfa';
+  document.getElementById('tb-crumb').textContent='AKM Şubeleri';
+  const personel = dbGet('personel');
+  const aktif = personel.filter(p=>p.calisma_durumu==='Aktif').length;
+  document.getElementById('s-personel').textContent = personel.length;
+  document.getElementById('s-aktif').textContent = aktif;
+
+  const tbody = document.getElementById('sube-tbody');
+  tbody.innerHTML = SUBELER.map(s=>{
+    const sayisi = personel.filter(p=>p.irtibat_sube===s).length;
+    return `<tr>
+      <td><strong>${s}</strong></td>
+      <td class="text-center">-</td>
+      <td class="text-center">-</td>
+      <td class="text-center">-</td>
+      <td class="text-center"><span class="badge badge-blue">${sayisi}</span></td>
+      <td><button class="btn btn-outline btn-xs" onclick="goto('personel',{sube:'${s}'})">Detay →</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// PERSONEL LİSTESİ
+// ══════════════════════════════════════════════════════
+let _selId = null;
+let _currentSube = null;
+
+function showPersonel(params={}){
+  _selId = null; _currentSube = params.sube||null;
+  updateSelBtns();
+  const title = params.sube || 'Tüm Personel';
+  document.getElementById('p-title').textContent = title;
+  document.getElementById('tb-title').textContent = 'Personel Listesi';
+  document.getElementById('tb-crumb').textContent = title;
+  document.getElementById('p-search').value = '';
+  fillSubeSelect('mp-irtibat_sube');
+  renderPersonelTable();
+}
+
+function renderPersonelTable(){
+  const q = (document.getElementById('p-search')?.value||'').toLowerCase();
+  let rows = dbGet('personel');
+  if(_currentSube) rows = rows.filter(p=>p.irtibat_sube===_currentSube);
+  if(q) rows = rows.filter(p=>
+    (p.adi_soyadi||'').toLowerCase().includes(q)||
+    (p.tc_kimlik_no||'').includes(q)||
+    (p.oda_sicil_no||'').toLowerCase().includes(q)
+  );
+  document.getElementById('p-count').textContent = rows.length + ' personel';
+  const tbody = document.getElementById('p-tbody');
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="11" class="empty">Personel bulunamadı</td></tr>'; return; }
+  const db = {Aktif:'badge-green',Pasif:'badge-red',Askıda:'badge-yellow',İptal:'badge-red'};
+  tbody.innerHTML = rows.map(p=>`<tr>
+    <td><input type="checkbox" ${_selId===p.id?'checked':''} onchange="selectPersonel(${p.id},this.checked)"></td>
+    <td><strong>${p.adi_soyadi||''}</strong></td>
+    <td class="text-sm">${p.irtibat_sube||'-'}</td>
+    <td class="text-sm">${p.temsilcilik||'-'}</td>
+    <td class="mono">${p.oda_sicil_no||'-'}</td>
+    <td class="mono">${p.tc_kimlik_no||'-'}</td>
+    <td class="text-sm">${p.cep_tel||'-'}</td>
+    <td class="text-sm truncate">${p.email||'-'}</td>
+    <td><span class="badge ${db[p.calisma_durumu]||'badge-gray'}">${p.calisma_durumu||'-'}</span></td>
+    <td class="text-sm">${p.meslegi||'-'}</td>
+    <td><span class="badge badge-gray text-sm">${p.kurulusdaki_gorevi||'-'}</span></td>
+  </tr>`).join('');
+}
+
+function selectPersonel(id, checked){
+  _selId = checked ? id : null;
+  // uncheck others
+  document.querySelectorAll('#p-tbody input[type=checkbox]').forEach(cb=>{
+    const row = cb.closest('tr');
+    const rowId = dbGet('personel').find(p=>p.adi_soyadi===row.cells[1].textContent)?.id;
+  });
+  // Re-render to reflect single selection
+  renderPersonelTable();
+  // But re-check the selected one
+  if(_selId!==null){
+    const personel = dbGet('personel');
+    const rows = _currentSube ? personel.filter(p=>p.irtibat_sube===_currentSube) : personel;
+    const q = (document.getElementById('p-search')?.value||'').toLowerCase();
+    const filtered = q ? rows.filter(p=>(p.adi_soyadi||'').toLowerCase().includes(q)||(p.tc_kimlik_no||'').includes(q)||(p.oda_sicil_no||'').toLowerCase().includes(q)) : rows;
+    filtered.forEach((p,i)=>{
+      const cb = document.querySelectorAll('#p-tbody input[type=checkbox]')[i];
+      if(cb && p.id===_selId) cb.checked = true;
+    });
+  }
+  updateSelBtns();
+}
+
+function updateSelBtns(){
+  const has = _selId !== null;
+  document.getElementById('btn-detay').disabled = !has;
+  document.getElementById('btn-edit').disabled = !has;
+  document.getElementById('btn-vasif').disabled = !has;
+  document.getElementById('sel-count').textContent = has ? '1 seçili' : '';
+}
+
+function selAction(action){
+  if(!_selId){ toast('Önce bir personel seçin','err'); return; }
+  if(action==='detay') goto('detay',{id:_selId, mode:'view'});
+  if(action==='edit')  goto('detay',{id:_selId, mode:'edit'});
+  if(action==='vasif') goto('vasif',{id:_selId});
+}
+
+function openAddPersonel(){
+  fillSubeSelect('mp-irtibat_sube');
+  ['adi_soyadi','temsilcilik','oda_sicil_no','tc_kimlik_no','cep_tel','email','meslegi'].forEach(f=>{
+    document.getElementById('mp-'+f).value='';
+  });
+  document.getElementById('mp-irtibat_sube').value = _currentSube||'';
+  document.getElementById('mp-calisma_durumu').value='Aktif';
+  document.getElementById('mp-kurulusdaki_gorevi').value='Muayene Personeli';
+  document.getElementById('m-p-title').textContent='Yeni Personel Ekle';
+  openModal('m-personel');
+}
+
+function savePersonel(){
+  const ad = document.getElementById('mp-adi_soyadi').value.trim();
+  if(!ad){ toast('Ad Soyad zorunlu','err'); return; }
+  const p = {
+    id: nextId(),
+    adi_soyadi: ad,
+    irtibat_sube: document.getElementById('mp-irtibat_sube').value,
+    temsilcilik: document.getElementById('mp-temsilcilik').value,
+    oda_sicil_no: document.getElementById('mp-oda_sicil_no').value,
+    tc_kimlik_no: document.getElementById('mp-tc_kimlik_no').value,
+    cep_tel: document.getElementById('mp-cep_tel').value,
+    email: document.getElementById('mp-email').value,
+    meslegi: document.getElementById('mp-meslegi').value,
+    kurulusdaki_gorevi: document.getElementById('mp-kurulusdaki_gorevi').value,
+    calisma_durumu: document.getElementById('mp-calisma_durumu').value,
+  };
+  const list = dbGet('personel');
+  list.push(p);
+  dbSet('personel', list);
+  closeModal('m-personel');
+  toast('Personel eklendi');
+  renderPersonelTable();
+  showDashboard(); // refresh stats then come back
+  showPersonel({sube:_currentSube});
+}
+
+function fillSubeSelect(selectId){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  sel.innerHTML = '<option value="">-- Şube Seçin --</option>' +
+    SUBELER.map(s=>`<option value="${s}">${s}</option>`).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// PERSONEL DETAY
+// ══════════════════════════════════════════════════════
+const D_FIELDS = ['adi_soyadi','temsilcilik','oda_sicil_no','tc_kimlik_no','dogum_tarihi','kan_grubu','mezuniyet_yili',
+  'cep_tel','email','meslegi','kurulusdaki_gorevi','calisma_durumu','calisma_turu','aciklama',
+  'akm_sozlesme_tarihi','sgk_giris_tarihi','sgk_cikis_tarihi',
+  'onceki_kurulus','is_deneyimi','sube_birimi','ek_aciklama',
+  'qdms_yetki_tarihi','qdms_yetki_dusurulme_tarihi',
+  'asansor_yazilim_yetki_tarihi','asansor_yazilim_yetki_dusurulme_tarihi',
+  'pk_yazilim_yetki_tarihi','pk_yazilim_yetki_dusurulme_tarihi',
+  'mobis_asansor_yetki_tarihi','mobis_asansor_yetki_dusurulme_tarihi'];
+
+function showDetay(id, mode='view'){
+  const p = dbGet('personel').find(x=>x.id===id);
+  if(!p){ toast('Personel bulunamadı','err'); return; }
+  document.getElementById('tb-title').textContent = 'Personel Detay';
+  document.getElementById('tb-crumb').textContent = p.adi_soyadi;
+  document.getElementById('d-adi').textContent = p.adi_soyadi;
+  document.getElementById('d-id').value = id;
+  fillSubeSelect('d-irtibat_sube');
+  document.getElementById('d-irtibat_sube').value = p.irtibat_sube||'';
+  D_FIELDS.forEach(f=>{ const el=document.getElementById('d-'+f); if(el) el.value = p[f]||''; });
+  // set disabled state
+  const isEdit = mode==='edit';
+  document.querySelectorAll('#page-detay .form-control').forEach(el=>el.disabled=!isEdit);
+  document.getElementById('d-btn-edit').style.display = isEdit?'none':'';
+  document.getElementById('d-btn-save').style.display = isEdit?'':'none';
+  // reset to first tab
+  switchTab('d','bilgi');
+}
+
+function editModeOn(){
+  document.querySelectorAll('#page-detay .form-control').forEach(el=>el.disabled=false);
+  document.getElementById('d-btn-edit').style.display='none';
+  document.getElementById('d-btn-save').style.display='';
+}
+
+function saveDetay(){
+  const id = parseInt(document.getElementById('d-id').value);
+  const list = dbGet('personel');
+  const idx = list.findIndex(p=>p.id===id);
+  if(idx<0){ toast('Kayıt bulunamadı','err'); return; }
+  D_FIELDS.forEach(f=>{ const el=document.getElementById('d-'+f); if(el) list[idx][f]=el.value; });
+  list[idx].irtibat_sube = document.getElementById('d-irtibat_sube').value;
+  dbSet('personel', list);
+  toast('Kaydedildi');
+  document.querySelectorAll('#page-detay .form-control').forEach(el=>el.disabled=true);
+  document.getElementById('d-btn-edit').style.display='';
+  document.getElementById('d-btn-save').style.display='none';
+  document.getElementById('d-adi').textContent = list[idx].adi_soyadi;
+  document.getElementById('tb-crumb').textContent = list[idx].adi_soyadi;
+}
+
+function deletePersonel(){
+  const id = parseInt(document.getElementById('d-id').value);
+  if(!confirm('Bu personel ve tüm kayıtları silinecek. Emin misiniz?')) return;
+  dbSet('personel', dbGet('personel').filter(p=>p.id!==id));
+  dbSet('vasiflandirmalar', dbGet('vasiflandirmalar').filter(v=>v.personel_id!==id));
+  dbSet('egitimler', dbGet('egitimler').filter(e=>e.personel_id!==id));
+  dbSet('gozetimler', dbGet('gozetimler').filter(g=>g.personel_id!==id));
+  toast('Personel silindi');
+  geriGit();
+}
+
+// ── EĞİTİM ───────────────────────────────────────────────────────────
+function renderEgitimler(){
+  const id = parseInt(document.getElementById('d-id').value);
+  const rows = dbGet('egitimler').filter(e=>e.personel_id===id);
+  const tbody = document.getElementById('egitim-tbody');
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">Kayıt yok</td></tr>'; return; }
+  tbody.innerHTML = rows.map(e=>`<tr>
+    <td class="mono">${e.tarih||'-'}</td>
+    <td>${e.yer||'-'}</td>
+    <td>${e.egitmen||'-'}</td>
+    <td>${e.vasif_yer||'-'}</td>
+    <td>${e.gozlemci||'-'}</td>
+    <td class="mono">${e.goz_rapor||'-'}</td>
+    <td class="mono">${e.bel_kurul||'-'}</td>
+    <td class="mono">${e.atama||'-'}</td>
+    <td><button class="btn btn-danger btn-xs" onclick="delEgitim(${e.id})">Sil</button></td>
+  </tr>`).join('');
+}
+
+function openAddEgitim(){
+  ['tarih','yer','egitmen','vasif_yer','gozlemci','goz_rapor','bel_kurul','atama'].forEach(f=>{
+    document.getElementById('eg-'+f).value='';
+  });
+  openModal('m-egitim');
+}
+
+function saveEgitim(){
+  const pid = parseInt(document.getElementById('d-id').value);
+  const e = {
+    id: nextId(), personel_id: pid,
+    tarih: document.getElementById('eg-tarih').value,
+    yer: document.getElementById('eg-yer').value,
+    egitmen: document.getElementById('eg-egitmen').value,
+    vasif_yer: document.getElementById('eg-vasif_yer').value,
+    gozlemci: document.getElementById('eg-gozlemci').value,
+    goz_rapor: document.getElementById('eg-goz_rapor').value,
+    bel_kurul: document.getElementById('eg-bel_kurul').value,
+    atama: document.getElementById('eg-atama').value,
+  };
+  const list = dbGet('egitimler'); list.push(e); dbSet('egitimler', list);
+  closeModal('m-egitim'); toast('Eğitim eklendi'); renderEgitimler();
+}
+
+function delEgitim(id){
+  if(!confirm('Silinecek. Emin misiniz?')) return;
+  dbSet('egitimler', dbGet('egitimler').filter(e=>e.id!==id));
+  toast('Silindi'); renderEgitimler();
+}
+
+// ── GÖZETİM ──────────────────────────────────────────────────────────
+function renderGozetimler(){
+  const pid = parseInt(document.getElementById('d-id').value);
+  const rows = dbGet('gozetimler').filter(g=>g.personel_id===pid);
+  const grid = document.getElementById('goz-grid');
+  const addCard = `<div class="goz-card goz-card-add" onclick="addGozetim(${pid})"><div style="text-align:center"><div style="font-size:28px">+</div><div style="font-size:13px;margin-top:4px">Yeni Gözetim</div></div></div>`;
+  grid.innerHTML = rows.map(g=>`<div class="goz-card">
+    <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
+      <button class="btn btn-outline btn-xs" onclick="saveGoz(${g.id})">Kaydet</button>
+      <button class="btn btn-danger btn-xs" onclick="delGoz(${g.id},${pid})">Sil</button>
+    </div>
+    <div class="goz-field"><label>TARİH</label><input class="form-control" type="date" id="gz-t-${g.id}" value="${g.tarih||''}"></div>
+    <div class="goz-field"><label>GÖZETMEN ADI SOYADI</label><input class="form-control" id="gz-g-${g.id}" value="${g.gozletmen||''}"></div>
+    <div class="goz-field"><label>RAPOR NO</label><input class="form-control" id="gz-r-${g.id}" value="${g.rapor_no||''}"></div>
+    <div class="goz-field"><label>MÜŞTERİ NO</label><input class="form-control" id="gz-m-${g.id}" value="${g.musteri_no||''}"></div>
+  </div>`).join('') + addCard;
+}
+
+function addGozetim(pid){
+  const list = dbGet('gozetimler');
+  list.push({id:nextId(), personel_id:pid, tarih:'', gozletmen:'', rapor_no:'', musteri_no:''});
+  dbSet('gozetimler', list);
+  renderGozetimler();
+}
+
+function saveGoz(id){
+  const list = dbGet('gozetimler');
+  const idx = list.findIndex(g=>g.id===id);
+  if(idx<0) return;
+  list[idx].tarih = document.getElementById('gz-t-'+id)?.value||'';
+  list[idx].gozletmen = document.getElementById('gz-g-'+id)?.value||'';
+  list[idx].rapor_no = document.getElementById('gz-r-'+id)?.value||'';
+  list[idx].musteri_no = document.getElementById('gz-m-'+id)?.value||'';
+  dbSet('gozetimler', list);
+  toast('Gözetim kaydedildi');
+}
+
+function delGoz(id, pid){
+  if(!confirm('Silinecek. Emin misiniz?')) return;
+  dbSet('gozetimler', dbGet('gozetimler').filter(g=>g.id!==id));
+  toast('Silindi'); renderGozetimler();
+}
+
+// ══════════════════════════════════════════════════════
+// VASIFLANDİRMA
+// ══════════════════════════════════════════════════════
+let _vasifPid = null;
+let _cbChecked = new Set(); // seçili ekipman id'leri (string)
+
+function showVasif(id){
+  _vasifPid = id;
+  _cbChecked.clear();
+  const p = dbGet('personel').find(x=>x.id===id);
+  document.getElementById('tb-title').textContent = 'Vasıflandırma';
+  document.getElementById('tb-crumb').textContent = p?.adi_soyadi||'';
+  document.getElementById('v-adi').textContent = p?.adi_soyadi||'';
+  document.getElementById('v-search').value='';
+  document.getElementById('v-cb-list').style.display='none';
+  document.getElementById('v-add-bar').style.display='none';
+  const bar = document.getElementById('v-bulk-bar');
+  if(bar) bar.style.display='none';
+  renderEkipmanCards('v-ekipman-cards', _vasifPid);
+}
+
+// ── Arama & Checkbox ─────────────────────────────────
+function vasifSearch(q){
+  const cbList = document.getElementById('v-cb-list');
+  const addBar = document.getElementById('v-add-bar');
+  if(!q.trim()){ cbList.style.display='none'; addBar.style.display='none'; _cbChecked.clear(); return; }
+  const ql = q.toLowerCase();
+  const existing = new Set(dbGet('vasiflandirmalar').filter(v=>v.personel_id===_vasifPid).map(v=>v.ekipman_id));
+  const filtered = EKIPMANLAR.filter(e=>e.id.toLowerCase().includes(ql)||e.ad.toLowerCase().includes(ql));
+  if(!filtered.length){ cbList.innerHTML='<div class="empty" style="padding:16px">Sonuç bulunamadı</div>'; cbList.style.display='block'; return; }
+  cbList.innerHTML = filtered.map(e=>{
+    const alreadyAdded = existing.has(e.id);
+    const checked = _cbChecked.has(e.id);
+    return `<label class="v-cb-item${checked?' checked':''}${alreadyAdded?' opacity-50':''}">
+      <input type="checkbox" ${checked?'checked':''} ${alreadyAdded?'disabled':''} onchange="toggleCbVasif('${e.id}',this.checked)">
+      <div><div class="v-cb-code">${e.id}</div><div class="v-cb-name">${e.ad}${alreadyAdded?' <span style=\'color:var(--green);font-size:11px\'> ✓ Eklendi</span>':''}</div></div>
+    </label>`;
+  }).join('');
+  cbList.style.display='block';
+  updateAddBar();
+}
+
+function toggleCbVasif(ekipmanId, checked){
+  if(checked) _cbChecked.add(ekipmanId); else _cbChecked.delete(ekipmanId);
+  // Update label styling
+  const cbList = document.getElementById('v-cb-list');
+  cbList.querySelectorAll('.v-cb-item').forEach(lbl=>{
+    const cb = lbl.querySelector('input[type=checkbox]');
+    if(cb && !cb.disabled) lbl.classList.toggle('checked', cb.checked);
+  });
+  updateAddBar();
+}
+
+function updateAddBar(){
+  const bar = document.getElementById('v-add-bar');
+  const n = _cbChecked.size;
+  if(n>0){
+    bar.style.display='flex';
+    document.getElementById('v-sel-count').textContent = n + ' ekipman seçildi';
+  } else {
+    bar.style.display='none';
+  }
+}
+
+function addCheckedVasiflar(){
+  if(!_cbChecked.size) return;
+  const list = dbGet('vasiflandirmalar');
+  let added = 0;
+  _cbChecked.forEach(ekipmanId=>{
+    if(!list.find(v=>v.personel_id===_vasifPid && v.ekipman_id===ekipmanId)){
+      list.push({id:nextId(), personel_id:_vasifPid, ekipman_id:ekipmanId});
+      added++;
+    }
+  });
+  dbSet('vasiflandirmalar', list);
+  toast(added + ' ekipman eklendi');
+  clearVasifSearch();
+  renderEkipmanCards('v-ekipman-cards', _vasifPid);
+}
+
+function clearVasifSearch(){
+  _cbChecked.clear();
+  document.getElementById('v-search').value='';
+  document.getElementById('v-cb-list').style.display='none';
+  document.getElementById('v-add-bar').style.display='none';
+}
+
+function removeVasif(vasifId, pid, container){
+  if(!confirm('Bu ekipman vasıflandırmadan kaldırılacak. Emin misiniz?')) return;
+  dbSet('vasiflandirmalar', dbGet('vasiflandirmalar').filter(v=>v.id!==vasifId));
+  // Also remove egitim/gozetim for this vasifId
+  renderEkipmanCards(container, pid||_vasifPid);
+  toast('Kaldırıldı');
+}
+
+// ── Ekipman Kartları (hem vasif sayfası hem detay sekmesi) ───
+function renderEkipmanCards(containerId, pid){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const vasiflar = dbGet('vasiflandirmalar').filter(v=>v.personel_id===pid);
+  if(!vasiflar.length){
+    container.innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>Henüz vasıflandırma eklenmemiş</p></div>';
+    return;
+  }
+  // Detay sekmesinde sadece liste göster
+  if(containerId === 'd-vasif-cards'){
+    container.innerHTML = `<div class="card"><div class="table-wrap"><table>
+      <thead><tr><th>KOD</th><th>EKİPMAN ADI</th><th>EĞİTİM</th><th>GÖZETİM</th><th></th></tr></thead>
+      <tbody>${vasiflar.map(v=>{
+        const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'Bilinmeyen'};
+        const egSay = dbGet('egitimler').filter(eg=>eg.vasif_id===v.id).length;
+        const gzSay = dbGet('gozetimler').filter(g=>g.vasif_id===v.id).length;
+        return `<tr>
+          <td class="mono">${e.id}</td>
+          <td>${e.ad}</td>
+          <td class="text-center"><span class="badge ${egSay?'badge-blue':'badge-gray'}">${egSay}</span></td>
+          <td class="text-center"><span class="badge ${gzSay?'badge-blue':'badge-gray'}">${gzSay}</span></td>
+          <td><button class="btn btn-danger btn-xs" onclick="removeVasif(${v.id},${pid},'d-vasif-cards')">Kaldır</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div></div>`;
+    return;
+  }
+  // Vasıflandırma sayfasında: kartlar + sekmeler + toplu buton bar
+  const bar = document.getElementById('v-bulk-bar');
+  if(bar){ bar.style.display='flex'; document.getElementById('v-bulk-info').textContent = vasiflar.length+' ekipman'; }
+  container.innerHTML = vasiflar.map(v=>{
+    const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'Bilinmeyen'};
+    const egitimler = dbGet('egitimler').filter(eg=>eg.vasif_id===v.id);
+    const gozetimler = dbGet('gozetimler').filter(g=>g.vasif_id===v.id);
+    return `<div class="ekip-card" id="ekip-${v.id}">
+      <div class="ekip-card-head">
+        <div class="ekip-card-title">
+          <span class="ekip-code">${e.id}</span>
+          <span class="ekip-name">${e.ad}</span>
+        </div>
+        <button class="btn btn-danger btn-xs" onclick="removeVasif(${v.id},${pid},'${containerId}')">Kaldır</button>
+      </div>
+      <div class="ekip-tabs">
+        <button class="ekip-tab active" onclick="switchEkipTab(${v.id},'egitim')">📚 Eğitim (${egitimler.length})</button>
+        <button class="ekip-tab" onclick="switchEkipTab(${v.id},'gozetim')">👁 Gözetim (${gozetimler.length})</button>
+      </div>
+      <div class="ekip-body active" id="ekip-egitim-${v.id}">
+        ${renderEgitimBody(v.id, egitimler)}
+      </div>
+      <div class="ekip-body" id="ekip-gozetim-${v.id}">
+        ${renderGozetimBody(v.id, gozetimler)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function switchEkipTab(vasifId, tab){
+  const eg = document.getElementById('ekip-egitim-'+vasifId);
+  const gz = document.getElementById('ekip-gozetim-'+vasifId);
+  const card = document.getElementById('ekip-'+vasifId);
+  const tabs = card.querySelectorAll('.ekip-tab');
+  if(tab==='egitim'){ eg.classList.add('active'); gz.classList.remove('active'); tabs[0].classList.add('active'); tabs[1].classList.remove('active'); }
+  else             { gz.classList.add('active'); eg.classList.remove('active'); tabs[1].classList.add('active'); tabs[0].classList.remove('active'); }
+}
+
+function renderEgitimBody(vasifId, rows){
+  const tableRows = rows.length
+    ? rows.map(e=>`<tr>
+        <td class="mono">${e.tarih||'-'}</td>
+        <td>${e.yer||'-'}</td>
+        <td>${e.egitmen||'-'}</td>
+        <td>${e.vasif_yer||'-'}</td>
+        <td>${e.gozlemci||'-'}</td>
+        <td class="mono">${e.goz_rapor||'-'}</td>
+        <td class="mono">${e.bel_kurul||'-'}</td>
+        <td class="mono">${e.atama||'-'}</td>
+        <td><button class="btn btn-danger btn-xs" onclick="delEgitimV(${e.id},${vasifId})">Sil</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="9" class="empty" style="padding:12px">Kayıt yok — yukarıdan "Eğitim Ekle" ile ekleyin</td></tr>';
+  return `<div class="text-muted text-sm mb-2">Eğitim kayıtları</div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>TARİH</th><th>ALINAN YER</th><th>EĞİTMEN</th><th>VASIFLANDİRILAN YER</th><th>GÖZLEMCİ</th><th>GÖZ.RAPOR</th><th>BEL.KURUL</th><th>ATAMA</th><th></th></tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table></div>`;
+}
+
+function renderGozetimBody(vasifId, rows){
+  const cards = rows.map(g=>`<div class="goz-card">
+    <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
+      <button class="btn btn-outline btn-xs" onclick="saveGozV(${g.id},${vasifId})">Kaydet</button>
+      <button class="btn btn-danger btn-xs" onclick="delGozV(${g.id},${vasifId})">Sil</button>
+    </div>
+    <div class="goz-field"><label>TARİH</label><input class="form-control" type="date" id="gzv-t-${g.id}" value="${g.tarih||''}"></div>
+    <div class="goz-field"><label>GÖZETMEN</label><input class="form-control" id="gzv-g-${g.id}" value="${g.gozletmen||''}"></div>
+    <div class="goz-field"><label>RAPOR NO</label><input class="form-control" id="gzv-r-${g.id}" value="${g.rapor_no||''}"></div>
+    <div class="goz-field"><label>MÜŞTERİ NO</label><input class="form-control" id="gzv-m-${g.id}" value="${g.musteri_no||''}"></div>
+  </div>`).join('');
+  return `<div class="text-muted text-sm mb-2">Gözetim kayıtları — yukarıdan "Gözetim Ekle" ile ekleyin</div>
+  <div class="goz-grid">${cards || '<div class="empty" style="padding:12px">Kayıt yok</div>'}</div>`;
+}
+
+// ── Toplu Eğitim ─────────────────────────────────────────────
+function openBulkEgitimModal(){
+  const vasiflar = dbGet('vasiflandirmalar').filter(v=>v.personel_id===_vasifPid);
+  if(!vasiflar.length){ toast('Önce ekipman ekleyin','err'); return; }
+  const listEl = document.getElementById('bulk-eg-ekipman-list');
+  listEl.innerHTML = vasiflar.map(v=>{
+    const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'?'};
+    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-radius:4px;transition:background .1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <input type="checkbox" checked data-vasif-id="${v.id}" style="flex-shrink:0">
+      <span style="font-family:monospace;font-size:11px;color:var(--accent)">${e.id}</span>
+      <span style="font-size:12px">${e.ad}</span>
+    </label>`;
+  }).join('');
+  ['beg-tarih','beg-yer','beg-egitmen','beg-vasif_yer','beg-gozlemci','beg-goz_rapor','beg-bel_kurul','beg-atama'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  openModal('m-bulk-egitim');
+}
+function bulkEgSelectAll(v){
+  document.querySelectorAll('#bulk-eg-ekipman-list input[type=checkbox]').forEach(cb=>cb.checked=v);
+}
+function saveBulkEgitim(){
+  const pid = _vasifPid;
+  const secilenler = [...document.querySelectorAll('#bulk-eg-ekipman-list input[type=checkbox]:checked')].map(cb=>parseInt(cb.getAttribute('data-vasif-id')));
+  if(!secilenler.length){ toast('En az bir ekipman seçin','err'); return; }
+  const list = dbGet('egitimler');
+  const base = {
+    tarih:document.getElementById('beg-tarih').value,
+    yer:document.getElementById('beg-yer').value,
+    egitmen:document.getElementById('beg-egitmen').value,
+    vasif_yer:document.getElementById('beg-vasif_yer').value,
+    gozlemci:document.getElementById('beg-gozlemci').value,
+    goz_rapor:document.getElementById('beg-goz_rapor').value,
+    bel_kurul:document.getElementById('beg-bel_kurul').value,
+    atama:document.getElementById('beg-atama').value,
+  };
+  secilenler.forEach(vasifId=>{
+    list.push({id:nextId(), vasif_id:vasifId, personel_id:pid, ...base});
+  });
+  dbSet('egitimler', list);
+  closeModal('m-bulk-egitim');
+  toast(secilenler.length+' ekipmana eğitim eklendi');
+  renderEkipmanCards('v-ekipman-cards', pid);
+}
+
+// ── Toplu Gözetim ─────────────────────────────────────────────
+function openBulkGozModal(){
+  const vasiflar = dbGet('vasiflandirmalar').filter(v=>v.personel_id===_vasifPid);
+  if(!vasiflar.length){ toast('Önce ekipman ekleyin','err'); return; }
+  const listEl = document.getElementById('bulk-gz-ekipman-list');
+  listEl.innerHTML = vasiflar.map(v=>{
+    const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'?'};
+    return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-radius:4px;transition:background .1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <input type="checkbox" checked data-vasif-id="${v.id}" style="flex-shrink:0">
+      <span style="font-family:monospace;font-size:11px;color:var(--accent)">${e.id}</span>
+      <span style="font-size:12px">${e.ad}</span>
+    </label>`;
+  }).join('');
+  ['bgz-tarih','bgz-gozletmen','bgz-rapor_no','bgz-musteri_no'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  openModal('m-bulk-goz');
+}
+function bulkGzSelectAll(v){
+  document.querySelectorAll('#bulk-gz-ekipman-list input[type=checkbox]').forEach(cb=>cb.checked=v);
+}
+function saveBulkGoz(){
+  const pid = _vasifPid;
+  const secilenler = [...document.querySelectorAll('#bulk-gz-ekipman-list input[type=checkbox]:checked')].map(cb=>parseInt(cb.getAttribute('data-vasif-id')));
+  if(!secilenler.length){ toast('En az bir ekipman seçin','err'); return; }
+  const list = dbGet('gozetimler');
+  const base = {
+    tarih:document.getElementById('bgz-tarih').value,
+    gozletmen:document.getElementById('bgz-gozletmen').value,
+    rapor_no:document.getElementById('bgz-rapor_no').value,
+    musteri_no:document.getElementById('bgz-musteri_no').value,
+  };
+  secilenler.forEach(vasifId=>{
+    list.push({id:nextId(), vasif_id:vasifId, personel_id:pid, ...base});
+  });
+  dbSet('gozetimler', list);
+  closeModal('m-bulk-goz');
+  toast(secilenler.length+' ekipmana gözetim eklendi');
+  renderEkipmanCards('v-ekipman-cards', pid);
+}
+
+// ── Tekil Eğitim modal (eski m-egitim modal'ı için — artık kullanılmıyor ama modal HTML var) ──
+let _activeVasifId = null;
+function openEgitimModal(vasifId){
+  _activeVasifId = vasifId;
+  ['tarih','yer','egitmen','vasif_yer','gozlemci','goz_rapor','bel_kurul','atama'].forEach(f=>{ document.getElementById('eg-'+f).value=''; });
+  openModal('m-egitim');
+}
+function saveEgitim(){
+  const pid = parseInt(document.getElementById('d-id').value)||_vasifPid;
+  const e = {
+    id:nextId(), vasif_id:_activeVasifId, personel_id:pid,
+    tarih:document.getElementById('eg-tarih').value,
+    yer:document.getElementById('eg-yer').value,
+    egitmen:document.getElementById('eg-egitmen').value,
+    vasif_yer:document.getElementById('eg-vasif_yer').value,
+    gozlemci:document.getElementById('eg-gozlemci').value,
+    goz_rapor:document.getElementById('eg-goz_rapor').value,
+    bel_kurul:document.getElementById('eg-bel_kurul').value,
+    atama:document.getElementById('eg-atama').value,
+  };
+  const list=dbGet('egitimler'); list.push(e); dbSet('egitimler',list);
+  closeModal('m-egitim'); toast('Eğitim eklendi');
+  refreshEkipCard(_activeVasifId);
+}
+function delEgitimV(id, vasifId){
+  if(!confirm('Silinecek. Emin misiniz?')) return;
+  dbSet('egitimler', dbGet('egitimler').filter(e=>e.id!==id));
+  toast('Silindi'); refreshEkipCard(vasifId);
+}
+
+// ── Gözetim (vasif bağlantılı) ───────────────────────────────
+function addGozV(vasifId){
+  const pid = _vasifPid || parseInt(document.getElementById('d-id').value);
+  const list=dbGet('gozetimler');
+  list.push({id:nextId(), vasif_id:vasifId, personel_id:pid, tarih:'', gozletmen:'', rapor_no:'', musteri_no:''});
+  dbSet('gozetimler',list); refreshEkipCard(vasifId);
+}
+function saveGozV(id, vasifId){
+  const list=dbGet('gozetimler');
+  const idx=list.findIndex(g=>g.id===id); if(idx<0) return;
+  list[idx].tarih=document.getElementById('gzv-t-'+id)?.value||'';
+  list[idx].gozletmen=document.getElementById('gzv-g-'+id)?.value||'';
+  list[idx].rapor_no=document.getElementById('gzv-r-'+id)?.value||'';
+  list[idx].musteri_no=document.getElementById('gzv-m-'+id)?.value||'';
+  dbSet('gozetimler',list); toast('Gözetim kaydedildi');
+}
+function delGozV(id, vasifId){
+  if(!confirm('Silinecek?')) return;
+  dbSet('gozetimler',dbGet('gozetimler').filter(g=>g.id!==id));
+  toast('Silindi'); refreshEkipCard(vasifId);
+}
+
+// ── Tek kartı yenile (tab durumunu koruyarak) ─────────────────
+function refreshEkipCard(vasifId){
+  // Hangi tab aktif?
+  const egBody = document.getElementById('ekip-egitim-'+vasifId);
+  const activeTab = egBody?.classList.contains('active') ? 'egitim' : 'gozetim';
+  // Hangi container?
+  const card = document.getElementById('ekip-'+vasifId);
+  const containerId = card?.closest('[id]')?.id || 'v-ekipman-cards';
+  const pid = _vasifPid || parseInt(document.getElementById('d-id').value);
+  renderEkipmanCards(containerId, pid);
+  // Aktif tabı geri aç
+  setTimeout(()=>switchEkipTab(vasifId, activeTab), 0);
+}
+
+// ── Detay sekmesinden vasıf render ───────────────────────────
+function renderDetayVasiflar(){
+  const pid = parseInt(document.getElementById('d-id').value);
+  renderEkipmanCards('d-vasif-cards', pid);
+}
+
+// ══════════════════════════════════════════════════════
+// CSV İMPORT
+// ══════════════════════════════════════════════════════
+function showImport(){
+  document.getElementById('tb-title').textContent='CSV İmport';
+  document.getElementById('tb-crumb').textContent='Veri Aktarımı';
+  document.getElementById('imp-result').innerHTML='';
+}
+
+function importCSV(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    // Strip BOM
+    if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+    const lines = text.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2){ toast('Dosya çok kısa veya boş','err'); return; }
+    // detect separator
+    const sep = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].split(sep).map(h=>h.trim().toLowerCase());
+    // map headers
+    const colMap = {
+      adi_soyadi: ['adi soyadi','ad soyad','adı soyadı','adi soyadı','isim','isim soyisim'],
+      irtibat_sube: ['irtibat şube','sube','şube','irtibat sube'],
+      tc_kimlik_no: ['tc kimlik no','tc','tc no','kimlik no','tcno'],
+      oda_sicil_no: ['oda sicil no','sicil no','sicil','oda sicil'],
+      cep_tel: ['cep tel','telefon','tel','gsm','cep telefonu'],
+      email: ['e-mail','email','e-posta','mail'],
+      meslegi: ['mesleği','meslek','meslek adı'],
+      kurulusdaki_gorevi: ['kuruluştaki görevi','görevi','gorev','kuruluş görevi','gorevi'],
+      calisma_durumu: ['çalışma durumu','durum','calisma durumu'],
+    };
+    const findCol = (possible) => {
+      for(const p of possible){ const i=headers.indexOf(p); if(i>=0) return i; }
+      return -1;
+    };
+    const colIdx = {};
+    for(const [field,possible] of Object.entries(colMap)) colIdx[field]=findCol(possible);
+
+    if(colIdx.adi_soyadi<0){ toast('ADI SOYADI kolonu bulunamadı','err'); return; }
+
+    const existing = dbGet('personel');
+    let imported=0, skipped=0, errors=[];
+
+    for(let i=1;i<lines.length;i++){
+      const cells = lines[i].split(sep).map(c=>c.trim().replace(/^["']|["']$/g,''));
+      const ad = colIdx.adi_soyadi>=0 ? cells[colIdx.adi_soyadi]||'' : '';
+      if(!ad.trim()){ skipped++; continue; }
+      // skip duplicates by name
+      if(existing.find(p=>p.adi_soyadi.toLowerCase()===ad.toLowerCase())){ skipped++; errors.push(`Zaten var: ${ad}`); continue; }
+      const p = {id:nextId(), adi_soyadi:ad};
+      for(const [field,idx] of Object.entries(colIdx)){
+        if(field!=='adi_soyadi' && idx>=0) p[field]=cells[idx]||'';
+      }
+      if(!p.calisma_durumu) p.calisma_durumu='Aktif';
+      if(!p.kurulusdaki_gorevi) p.kurulusdaki_gorevi='Muayene Personeli';
+      existing.push(p); imported++;
+    }
+    dbSet('personel', existing);
+    const el = document.getElementById('imp-result');
+    el.innerHTML=`<div class="card"><div class="card-body">
+      <p style="color:var(--green);font-weight:600;margin-bottom:8px">✓ ${imported} kayıt aktarıldı</p>
+      <p class="text-muted text-sm">İçe aktarılan: <strong>${imported}</strong> &nbsp;|&nbsp; Atlanan: <strong>${skipped}</strong></p>
+      ${errors.length?`<div style="margin-top:10px;font-size:12px;color:var(--yellow);max-height:120px;overflow:auto">${errors.slice(0,20).map(e=>`<div>• ${e}</div>`).join('')}</div>`:''}
+    </div></div>`;
+    toast(`${imported} kayıt aktarıldı`);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+initDB();
+showDashboard();
+</script>
+</body>
+</html>
