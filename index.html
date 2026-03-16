@@ -337,11 +337,11 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
     <button class="btn btn-outline btn-sm" onclick="geriGit()">← Geri</button>
   </div>
   <div class="card mb-3">
-    <div class="card-header"><span class="card-title">Ekipman Ara &amp; Seç</span></div>
+    <div class="card-header"><span class="card-title">Yeni Ekipman Ekle</span></div>
     <div class="card-body">
       <div id="vasif-wrap" style="max-width:580px">
         <div class="search-box"><span class="si">🔍</span>
-          <input class="form-control" id="v-search" placeholder="Ekipman kodu veya adı yazın… (örn: kazan, asansör, vinç)" style="padding-left:30px" autocomplete="off" oninput="vasifSearch(this.value)">
+          <input class="form-control" id="v-search" placeholder="Ekipman kodu veya adı yazın…" style="padding-left:30px" autocomplete="off">
         </div>
         <div id="v-cb-list" style="display:none;margin-top:6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);max-height:300px;overflow-y:auto"></div>
       </div>
@@ -357,6 +357,13 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
     <span class="text-muted text-sm" id="v-bulk-info"></span>
     <button class="btn btn-primary btn-sm" onclick="openBulkEgitimModal()">📚 Eğitim Ekle</button>
     <button class="btn btn-outline btn-sm" onclick="openBulkGozModal()">👁 Gözetim Ekle</button>
+  </div>
+  <!-- Ekipman filtre -->
+  <div id="v-filter-wrap" style="display:none;margin-bottom:12px">
+    <div class="search-box" style="max-width:400px">
+      <span class="si">🔍</span>
+      <input class="form-control" id="v-filter" placeholder="Eklenen ekipmanları filtrele…" style="padding-left:30px" autocomplete="off">
+    </div>
   </div>
   <div id="v-ekipman-cards"></div>
 </div>
@@ -515,6 +522,20 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
   </div>
 </div>
 
+<!-- MODAL: Vasıf Detay -->
+<div class="modal-overlay" id="m-vasif-detay">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header">
+      <span class="modal-title" id="mvd-title"></span>
+      <button class="modal-close" onclick="closeModal('m-vasif-detay')">×</button>
+    </div>
+    <div class="modal-body" id="mvd-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('m-vasif-detay')">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-wrap"></div>
 
 
@@ -532,6 +553,16 @@ function showLoading(show) {
   const el = document.getElementById('loading-overlay');
   if(el) el.style.display = show ? 'flex' : 'none';
 }
+
+// ── Tarih formatlayıcı (YYYY-MM-DD → GG.AA.YYYY) ──────────────────
+function fmtDate(d) {
+  if(!d || d==='-') return '-';
+  // YYYY-MM-DD formatını dönüştür
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[3]+'.'+m[2]+'.'+m[1];
+  return d;
+}
+
 function nextId() { return Date.now() + Math.floor(Math.random()*9999); }
 
 // ── Cache ─────────────────────────────────────────────
@@ -758,6 +789,102 @@ const EKIPMANLAR = [
   {id:'D38-01',ad:'TS EN ISO/IEC 17020 İç Denetçi'},
   {id:'D38-02',ad:'TS EN ISO/IEC 17065 İç Denetçi'},
   {id:'D38-03',ad:'EA 2/17 İç Denetçi'},
+  {id:'D01-01',ad:'Kazanların İmalat Kontrolü - Kaynakçı Sertifikası Kontrolü'},
+  {id:'D01-02',ad:'Kazanların İmalat Kontrolü - WPS ve PQR/WPAR Kontrolü'},
+  {id:'D01-03',ad:'Kazanların İmalat Kontrolü - Kaynak Dolgu Malzemesi'},
+  {id:'D01-04',ad:'Kazanların İmalat Kontrolü - Malzeme Kontrolü ve Onayı'},
+  {id:'D01-05',ad:'Kazanların İmalat Kontrolü - Montaj Kontrolü'},
+  {id:'D01-06',ad:'Kazanların İmalat Kontrolü - Külhan Kontrolü'},
+  {id:'D01-07',ad:'Kazanların İmalat Kontrolü - Kaynakların Göz Kontrolü'},
+  {id:'D01-08',ad:'Kazanların İmalat Kontrolü - Radyografi Değerlendirme'},
+  {id:'D01-09',ad:'Kazanların İmalat Kontrolü - Boyut ve Oryantasyon Kontrolü'},
+  {id:'D03-01',ad:'Basınçlı Kaplar İmalat - Kaynakçı Sertifikası'},
+  {id:'D03-02',ad:'Basınçlı Kaplar İmalat - WPS ve PQR/WPAR'},
+  {id:'D03-03',ad:'Basınçlı Kaplar İmalat - Kaynak Dolgu Malzemesi'},
+  {id:'D03-04',ad:'Basınçlı Kaplar İmalat - Malzeme Kontrolü ve Onayı'},
+  {id:'D03-05',ad:'Basınçlı Kaplar İmalat - Montaj Kontrolü'},
+  {id:'D03-06',ad:'Basınçlı Kaplar İmalat - Külhan Kontrolü'},
+  {id:'D03-07',ad:'Basınçlı Kaplar İmalat - Kaynakların Göz Kontrolü'},
+  {id:'D03-08',ad:'Basınçlı Kaplar İmalat - Radyografi Değerlendirme'},
+  {id:'D03-09',ad:'Basınçlı Kaplar İmalat - Boyut ve Oryantasyon Kontrolü'},
+  {id:'D05-01',ad:'Depolama Tankları İmalat - Kaynakçı Sertifikası'},
+  {id:'D05-02',ad:'Depolama Tankları İmalat - WPS ve PQR/WPAR'},
+  {id:'D05-03',ad:'Depolama Tankları İmalat - Kaynak Dolgu Malzemesi'},
+  {id:'D05-04',ad:'Depolama Tankları İmalat - Malzeme Kontrolü'},
+  {id:'D05-05',ad:'Depolama Tankları İmalat - Montaj Kontrolü'},
+  {id:'D05-06',ad:'Depolama Tankları İmalat - Çatı Kontrolü'},
+  {id:'D05-07',ad:'Depolama Tankları İmalat - Kaynakların Göz Kontrolü'},
+  {id:'D05-08',ad:'Depolama Tankları İmalat - Radyografi Değerlendirme'},
+  {id:'D05-09',ad:'Depolama Tankları İmalat - Boyut ve Oryantasyon'},
+  {id:'D05-10',ad:'Depolama Tankları İmalat - Tank İçi Kontrol'},
+  {id:'D05-11',ad:'Depolama Tankları İmalat - Nüfuz Testi'},
+  {id:'D06-01',ad:'Metal Boru İmalat - Kaynakçı Sertifikası'},
+  {id:'D06-02',ad:'Metal Boru İmalat - WPS ve PQR/WPAR'},
+  {id:'D06-03',ad:'Metal Boru İmalat - Kaynak Dolgu Malzemesi'},
+  {id:'D06-04',ad:'Metal Boru İmalat - Malzeme Kontrolü'},
+  {id:'D06-05',ad:'Metal Boru İmalat - Üretim Kontrolü'},
+  {id:'D06-06',ad:'Metal Boru İmalat - Boru İç-Dış Göz Kontrolü'},
+  {id:'D06-07',ad:'Metal Boru İmalat - Ultrasonik Kontrol'},
+  {id:'D06-08',ad:'Metal Boru İmalat - Radyografi Değerlendirme'},
+  {id:'D07-01',ad:'Metal Levha - Üretim Sırasında Kontrol'},
+  {id:'D07-02',ad:'Metal Levha - Mevcut Malzeme Kontrolü'},
+  {id:'D07-03',ad:'Metal Levha - Numune Alımı ve Damgalama'},
+  {id:'D07-04',ad:'Metal Levha - Malzeme Testlerine Nezaret'},
+  {id:'D07-05',ad:'Metal Levha - Boyut Kontrolü'},
+  {id:'D07-06',ad:'Metal Levha - Test Sonuçları Değerlendirme'},
+  {id:'D07-07',ad:'Metal Levha - Belge/Rapor Düzenleme'},
+  {id:'D08-01',ad:'Kaynak Yöntem Onayı - Kaynakçı Bilgilendirme'},
+  {id:'D08-02',ad:'Kaynak Yöntem Onayı - Test Parçası Kontrolü'},
+  {id:'D08-03',ad:'Kaynak Yöntem Onayı - Dolgu Malzemesi Kontrolü'},
+  {id:'D08-04',ad:'Kaynak Yöntem Onayı - Göz Kontrolü'},
+  {id:'D08-05',ad:'Kaynak Yöntem Onayı - Test Parçası Tanımlama'},
+  {id:'D08-06',ad:'Kaynak Yöntem Onayı - Test Bilgilendirme'},
+  {id:'D08-07',ad:'Kaynak Yöntem Onayı - Test Değerlendirme'},
+  {id:'D08-08',ad:'Kaynak Yöntem Onayı - PQR/WPAR Belgesi'},
+  {id:'D10-01-01',ad:'NDT Radyografi - Seviye I'},
+  {id:'D10-02-01',ad:'NDT Ultrasonik - Seviye I'},
+  {id:'D10-03-01',ad:'NDT Manyetik Parçacık - Seviye I'},
+  {id:'D10-04-01',ad:'NDT Sıvı Penetrant - Seviye I'},
+  {id:'D10-05-01',ad:'NDT Gözle Muayene - Seviye I'},
+  {id:'D11-01',ad:'Basınçlı Ekipman AB - Modül D/E/H'},
+  {id:'D11-02',ad:'Basınçlı Ekipman AB - Modül B'},
+  {id:'D11-03',ad:'Basınçlı Ekipman AB - Modül A1/F/G'},
+  {id:'D11-04',ad:'Basınçlı Ekipman AB - Sabit Bağlantı Prosedürü'},
+  {id:'D11-05',ad:'Basınçlı Ekipman AB - Malzeme Avrupa Onayı'},
+  {id:'D12-01',ad:'Taşınabilir Basınçlı Ekipman - Teknik Dosya'},
+  {id:'D12-02',ad:'Taşınabilir Basınçlı Ekipman - Dizayn Onayı'},
+  {id:'D12-03',ad:'Taşınabilir Basınçlı Ekipman - İmalat Kontrolü'},
+  {id:'D12-04',ad:'Taşınabilir Basınçlı Ekipman - Emniyet Gerekleri'},
+  {id:'D12-05',ad:'Taşınabilir Basınçlı Ekipman - Risk Analizi'},
+  {id:'D12-06',ad:'Taşınabilir Basınçlı Ekipman - Teknik Dosya İnceleme'},
+  {id:'D12-07',ad:'Taşınabilir Basınçlı Ekipman - ADR/RID Uygunluk'},
+  {id:'D12-08',ad:'Taşınabilir Basınçlı Ekipman - Sertifika Düzenleme'},
+  {id:'D13-01',ad:'Basit Basınçlı Ekipman AB - Teknik Dosya'},
+  {id:'D13-02',ad:'Basit Basınçlı Ekipman AB - Dizayn Onayı'},
+  {id:'D13-03',ad:'Basit Basınçlı Ekipman AB - İmalat Kontrolü'},
+  {id:'D13-04',ad:'Basit Basınçlı Ekipman AB - Emniyet Gerekleri'},
+  {id:'D13-05',ad:'Basit Basınçlı Ekipman AB - Risk Analizi'},
+  {id:'D13-06',ad:'Basit Basınçlı Ekipman AB - Teknik Dosya İnceleme'},
+  {id:'D13-07',ad:'Basit Basınçlı Ekipman AB - Sertifika Düzenleme'},
+  {id:'D14-01',ad:'Kaldırma Makinaları İmalat - Kaynakçı Sertifikası'},
+  {id:'D14-02',ad:'Kaldırma Makinaları İmalat - WPS ve PQR/WPAR'},
+  {id:'D14-03',ad:'Kaldırma Makinaları İmalat - Kaynak Dolgu Malzemesi'},
+  {id:'D14-04',ad:'Kaldırma Makinaları İmalat - Malzeme Kontrolü'},
+  {id:'D14-05',ad:'Kaldırma Makinaları İmalat - Montaj Kontrolü'},
+  {id:'D14-06',ad:'Kaldırma Makinaları İmalat - Çatı Kontrolü'},
+  {id:'D14-07',ad:'Kaldırma Makinaları İmalat - Kaynakların Göz Kontrolü'},
+  {id:'D14-08',ad:'Kaldırma Makinaları İmalat - Boyut Kontrolü'},
+  {id:'D14-09',ad:'Kaldırma Makinaları İmalat - Radyografi Değerlendirme'},
+  {id:'D14-10',ad:'Kaldırma Makinaları İmalat - Yük Testi'},
+  {id:'D15-01',ad:'Çelik Yapı İmalat - Kaynakçı Sertifikası'},
+  {id:'D15-02',ad:'Çelik Yapı İmalat - WPS ve PQR/WPAR'},
+  {id:'D15-03',ad:'Çelik Yapı İmalat - Kaynak Dolgu Malzemesi'},
+  {id:'D15-04',ad:'Çelik Yapı İmalat - Malzeme Kontrolü'},
+  {id:'D15-05',ad:'Çelik Yapı İmalat - Montaj Kontrolü'},
+  {id:'D15-06',ad:'Çelik Yapı İmalat - Çatı Kontrolü'},
+  {id:'D15-07',ad:'Çelik Yapı İmalat - Kaynakların Göz Kontrolü'},
+  {id:'D15-08',ad:'Çelik Yapı İmalat - Boyut Kontrolü'},
+  {id:'D15-09',ad:'Çelik Yapı İmalat - Radyografi Değerlendirme'},
 ];
 
 // ── DB helpers ────────────────────────────────────────────────────────
@@ -877,7 +1004,7 @@ function renderPersonelTable(){
   const db = {Aktif:'badge-green',Pasif:'badge-red',Askıda:'badge-yellow',İptal:'badge-red'};
   tbody.innerHTML = rows.map(p=>`<tr>
     <td><input type="checkbox" ${_selId===p.id?'checked':''} onchange="selectPersonel(${p.id},this.checked)"></td>
-    <td><strong>${p.adi_soyadi||''}</strong></td>
+    <td style="cursor:pointer" onclick="goto('detay',{id:${p.id},mode:'view'})" title="Detaya gitmek için tıklayın"><strong style="color:var(--accent)">${p.adi_soyadi||''}</strong></td>
     <td class="text-sm">${p.irtibat_sube||'-'}</td>
     <td class="text-sm">${p.temsilcilik||'-'}</td>
     <td class="mono">${p.oda_sicil_no||'-'}</td>
@@ -1090,7 +1217,7 @@ function delEgitim(id){
 // ── GÖZETİM ──────────────────────────────────────────────────────────
 function renderGozetimler(){
   const pid = parseInt(document.getElementById('d-id').value);
-  const rows = dbGet('gozetimler').filter(g=>g.personel_id===pid);
+  const rows = dbGet('gozetimler').filter(g=>g.personel_id==pid);
   const grid = document.getElementById('goz-grid');
   const addCard = `<div class="goz-card goz-card-add" onclick="addGozetim(${pid})"><div style="text-align:center"><div style="font-size:28px">+</div><div style="font-size:13px;margin-top:4px">Yeni Gözetim</div></div></div>`;
   grid.innerHTML = rows.map(g=>`<div class="goz-card">
@@ -1137,7 +1264,7 @@ let _vasifPid = null;
 let _cbChecked = new Set(); // seçili ekipman id'leri (string)
 
 function showVasif(id){
-  _vasifPid = id;
+  _vasifPid = parseInt(id)||id;
   _cbChecked.clear();
   const p = dbGet('personel').find(x=>x.id===id);
   document.getElementById('tb-title').textContent = 'Vasıflandırma';
@@ -1148,6 +1275,10 @@ function showVasif(id){
   document.getElementById('v-add-bar').style.display='none';
   const bar = document.getElementById('v-bulk-bar');
   if(bar) bar.style.display='none';
+  const fw = document.getElementById('v-filter-wrap');
+  if(fw) fw.style.display='none';
+  const fi = document.getElementById('v-filter');
+  if(fi) fi.value='';
   renderEkipmanCards('v-ekipman-cards', _vasifPid);
 }
 
@@ -1155,17 +1286,34 @@ function showVasif(id){
 function vasifSearch(q){
   const cbList = document.getElementById('v-cb-list');
   const addBar = document.getElementById('v-add-bar');
-  if(!q.trim()){ cbList.style.display='none'; addBar.style.display='none'; _cbChecked.clear(); return; }
+  if(!q.trim()){
+    cbList.style.display='none';
+    addBar.style.display='none';
+    _cbChecked.clear();
+    return;
+  }
   const ql = q.toLowerCase();
-  const existing = new Set(dbGet('vasiflandirmalar').filter(v=>v.personel_id===_vasifPid).map(v=>v.ekipman_id));
-  const filtered = EKIPMANLAR.filter(e=>e.id.toLowerCase().includes(ql)||e.ad.toLowerCase().includes(ql));
-  if(!filtered.length){ cbList.innerHTML='<div class="empty" style="padding:16px">Sonuç bulunamadı</div>'; cbList.style.display='block'; return; }
+  // personel_id number ya da string olabilir (Supabase number döndürür)
+  const pid = _vasifPid;
+  const existing = new Set(
+    dbGet('vasiflandirmalar')
+      .filter(v=> v.personel_id==pid)  // == ile hem string hem number eşleşir
+      .map(v=>v.ekipman_id)
+  );
+  const filtered = EKIPMANLAR.filter(e=>
+    e.id.toLowerCase().includes(ql) || e.ad.toLowerCase().includes(ql)
+  );
+  if(!filtered.length){
+    cbList.innerHTML='<div class="empty" style="padding:16px">Sonuç bulunamadı</div>';
+    cbList.style.display='block';
+    return;
+  }
   cbList.innerHTML = filtered.map(e=>{
     const alreadyAdded = existing.has(e.id);
     const checked = _cbChecked.has(e.id);
-    return `<label class="v-cb-item${checked?' checked':''}${alreadyAdded?' opacity-50':''}">
-      <input type="checkbox" ${checked?'checked':''} ${alreadyAdded?'disabled':''} onchange="toggleCbVasif('${e.id}',this.checked)">
-      <div><div class="v-cb-code">${e.id}</div><div class="v-cb-name">${e.ad}${alreadyAdded?' <span style=\'color:var(--green);font-size:11px\'> ✓ Eklendi</span>':''}</div></div>
+    return `<label class="v-cb-item${checked?' checked':''}${alreadyAdded?' opacity-50':''}" style="user-select:none;cursor:${alreadyAdded?'default':'pointer'}">
+      <input type="checkbox" data-ekid="${e.id}" ${checked?'checked':''} ${alreadyAdded?'disabled':''}>
+      <div><div class="v-cb-code">${e.id}</div><div class="v-cb-name">${e.ad}${alreadyAdded?' <span style="color:var(--green);font-size:11px"> ✓ Eklendi</span>':''}</div></div>
     </label>`;
   }).join('');
   cbList.style.display='block';
@@ -1198,7 +1346,7 @@ async function addCheckedVasiflar(){
   if(!_cbChecked.size) return;
   let added=0;
   for(const ekipmanId of _cbChecked){
-    if(!dbGet('vasiflandirmalar').find(v=>v.personel_id===_vasifPid&&v.ekipman_id===ekipmanId)){
+    if(!dbGet('vasiflandirmalar').find(v=>String(v.personel_id)===String(_vasifPid)&&String(v.ekipman_id)===String(ekipmanId))){
       await dbAdd('vasiflandirmalar',{personel_id:_vasifPid,ekipman_id:ekipmanId});
       added++;
     }
@@ -1225,25 +1373,38 @@ async function removeVasif(vasifId, pid, container){
 function renderEkipmanCards(containerId, pid){
   const container = document.getElementById(containerId);
   if(!container) return;
-  const vasiflar = dbGet('vasiflandirmalar').filter(v=>v.personel_id===pid);
+  const vasiflar = dbGet('vasiflandirmalar').filter(v=>v.personel_id==pid);
   if(!vasiflar.length){
     container.innerHTML='<div class="empty"><div class="empty-icon">📋</div><p>Henüz vasıflandırma eklenmemiş</p></div>';
     return;
   }
-  // Detay sekmesinde sadece liste göster
+  // Detay sekmesinde liste + son tarih + detay butonu
   if(containerId === 'd-vasif-cards'){
     container.innerHTML = `<div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>KOD</th><th>EKİPMAN ADI</th><th>EĞİTİM</th><th>GÖZETİM</th><th></th></tr></thead>
+      <thead><tr><th>KOD</th><th>EKİPMAN ADI</th><th>EĞİTİM</th><th>GÖZETİM</th><th>SON TARİH</th><th></th></tr></thead>
       <tbody>${vasiflar.map(v=>{
         const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'Bilinmeyen'};
-        const egSay = dbGet('egitimler').filter(eg=>eg.vasif_id===v.id).length;
-        const gzSay = dbGet('gozetimler').filter(g=>g.vasif_id===v.id).length;
+        const egList = dbGet('egitimler').filter(eg=>eg.vasif_id==v.id);
+        const gzList = dbGet('gozetimler').filter(g=>g.vasif_id==v.id);
+        const egSay = egList.length;
+        const gzSay = gzList.length;
+        // Son tarih: önce son gözetim, yoksa son eğitim atama tarihi
+        const sonGzTarih = gzList.filter(g=>g.tarih).sort((a,b)=>b.tarih.localeCompare(a.tarih))[0]?.tarih;
+        const sonEgTarih = egList.filter(x=>x.atama||x.tarih).sort((a,b)=>(b.atama||b.tarih||'').localeCompare(a.atama||a.tarih||''))[0];
+        const sonEgStr   = sonEgTarih?.atama || sonEgTarih?.tarih || null;
+        const sonHam     = sonGzTarih || sonEgStr || null;
+        const sonTarih   = fmtDate(sonHam);
+        const sonLabel   = sonGzTarih ? 'Gözetim' : (sonEgStr ? 'Eğitim' : '');
         return `<tr>
           <td class="mono">${e.id}</td>
           <td>${e.ad}</td>
           <td class="text-center"><span class="badge ${egSay?'badge-blue':'badge-gray'}">${egSay}</span></td>
           <td class="text-center"><span class="badge ${gzSay?'badge-blue':'badge-gray'}">${gzSay}</span></td>
-          <td><button class="btn btn-danger btn-xs" onclick="removeVasif(${v.id},${pid},'d-vasif-cards')">Kaldır</button></td>
+          <td class="text-sm">${sonTarih}${sonLabel&&sonHam?' <span style="font-size:10px;color:var(--text2)">('+sonLabel+')</span>':''}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-outline btn-xs" style="margin-right:4px" onclick="openVasifDetayModal(${v.id})">Detay</button>
+            <button class="btn btn-danger btn-xs" onclick="removeVasif(${v.id},${pid},'d-vasif-cards')">Kaldır</button>
+          </td>
         </tr>`;
       }).join('')}</tbody>
     </table></div></div>`;
@@ -1252,10 +1413,22 @@ function renderEkipmanCards(containerId, pid){
   // Vasıflandırma sayfasında: kartlar + sekmeler + toplu buton bar
   const bar = document.getElementById('v-bulk-bar');
   if(bar){ bar.style.display='flex'; document.getElementById('v-bulk-info').textContent = vasiflar.length+' ekipman'; }
-  container.innerHTML = vasiflar.map(v=>{
+  // Filtre kutusunu göster
+  const filterWrap = document.getElementById('v-filter-wrap');
+  if(filterWrap) filterWrap.style.display = 'block';
+  // Filtre uygula
+  const filterQ = (document.getElementById('v-filter')?.value||'').toLowerCase().trim();
+  const gorunurVasiflar = filterQ
+    ? vasiflar.filter(v=>{ const e=EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:''}; return e.id.toLowerCase().includes(filterQ)||e.ad.toLowerCase().includes(filterQ); })
+    : vasiflar;
+  if(!gorunurVasiflar.length){
+    container.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><p>Filtreyle eşleşen ekipman bulunamadı</p></div>';
+    return;
+  }
+  container.innerHTML = gorunurVasiflar.map(v=>{
     const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'Bilinmeyen'};
-    const egitimler = dbGet('egitimler').filter(eg=>eg.vasif_id===v.id);
-    const gozetimler = dbGet('gozetimler').filter(g=>g.vasif_id===v.id);
+    const egitimler = dbGet('egitimler').filter(eg=>eg.vasif_id==v.id);
+    const gozetimler = dbGet('gozetimler').filter(g=>g.vasif_id==v.id);
     return `<div class="ekip-card" id="ekip-${v.id}">
       <div class="ekip-card-head">
         <div class="ekip-card-title">
@@ -1431,10 +1604,74 @@ function refreshEkipCard(vasifId){
 }
 
 // ── Detay sekmesinden vasıf render ───────────────────────────
+// ── Ekipman Detay (detay sekmesinden) ────────────────────────────────
+function openEkipDetay(vasifId, pid) {
+  // vasıf sayfasına git ve o ekipmanı scroll ile göster
+  goto('vasif', {id: pid});
+  // Biraz bekleyip ilgili karta scroll yap
+  setTimeout(function() {
+    const el = document.getElementById('ekip-' + vasifId);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 500);
+}
+
+// ── Vasıf Detay Modal ─────────────────────────────────────────────────
+function openVasifDetayModal(vasifId) {
+  const v    = dbGet('vasiflandirmalar').find(x=>x.id==vasifId);
+  if(!v) return;
+  const e    = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'Bilinmeyen'};
+  const egList = dbGet('egitimler').filter(eg=>eg.vasif_id==vasifId);
+  const gzList = dbGet('gozetimler').filter(g=>g.vasif_id==vasifId);
+
+  // Eğitim tablosu
+  const egRows = egList.length
+    ? egList.map(eg=>`<tr>
+        <td class="text-sm">${fmtDate(eg.tarih)||'-'}</td>
+        <td>${eg.yer||'-'}</td>
+        <td>${eg.egitmen||'-'}</td>
+        <td>${eg.gozlemci||'-'}</td>
+        <td class="text-sm">${fmtDate(eg.goz_rapor)||'-'}</td>
+        <td class="text-sm">${fmtDate(eg.bel_kurul)||'-'}</td>
+        <td class="text-sm">${fmtDate(eg.atama)||'-'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" class="empty" style="padding:10px">Eğitim kaydı yok</td></tr>';
+
+  // Gözetim tablosu
+  const gzRows = gzList.length
+    ? gzList.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||'')).map(g=>`<tr>
+        <td class="text-sm">${fmtDate(g.tarih)||'-'}</td>
+        <td>${g.rapor_no||'-'}</td>
+        <td>${g.musteri_no||'-'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" class="empty" style="padding:10px">Gözetim kaydı yok</td></tr>';
+
+  // Modal içeriği
+  const modal = document.getElementById('m-vasif-detay');
+  document.getElementById('mvd-title').textContent = e.id + ' — ' + e.ad;
+  document.getElementById('mvd-body').innerHTML = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📚 EĞİTİM KAYITLARI</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>TARİH</th><th>ALINAN YER</th><th>EĞİTMEN</th><th>GÖZLEMCİ</th><th>GÖZ.RAPOR</th><th>BEL.KURUL</th><th>ATAMA</th></tr></thead>
+        <tbody>${egRows}</tbody>
+      </table></div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">👁 GÖZETİM KAYITLARI</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>TARİH</th><th>RAPOR NO</th><th>MÜŞTERİ NO</th></tr></thead>
+        <tbody>${gzRows}</tbody>
+      </table></div>
+    </div>`;
+  openModal('m-vasif-detay');
+}
+
 function renderDetayVasiflar(){
   const pid = parseInt(document.getElementById('d-id').value);
   renderEkipmanCards('d-vasif-cards', pid);
 }
+
+// Detay sekmesinden ekipman detayını aç (vasıflandırma sayfasına git)
 
 // ══════════════════════════════════════════════════════
 // CSV İMPORT
@@ -1507,7 +1744,35 @@ function importCSV(file){
   reader.readAsText(file, 'UTF-8');
 }
 
-document.addEventListener("DOMContentLoaded", function(){ initApp(); });
+document.addEventListener("DOMContentLoaded", function(){
+  initApp();
+});
+
+// ── Event delegation ─────────────────────────────────────────
+// vasifSearch input (yeni ekipman arama)
+document.addEventListener('input', function(e){
+  if(e.target.id === 'v-search') vasifSearch(e.target.value);
+  // Eklenen ekipmanları filtrele
+  if(e.target.id === 'v-filter') renderEkipmanCards('v-ekipman-cards', _vasifPid);
+});
+
+// v-cb-list checkbox change (inline onchange çalışmıyor, delegation kullan)
+document.addEventListener('change', function(e){
+  const cb = e.target;
+  if(cb.type === 'checkbox' && cb.dataset.ekid && cb.closest('#v-cb-list')){
+    toggleCbVasif(cb.dataset.ekid, cb.checked);
+  }
+});
+
+// v-cb-list label tıklaması — label>input ilişkisi bazen file:// de çalışmıyor
+document.addEventListener('click', function(e){
+  const lbl = e.target.closest('#v-cb-list .v-cb-item');
+  if(!lbl) return;
+  const cb = lbl.querySelector('input[type=checkbox]');
+  if(!cb || cb.disabled) return;
+  // Label tıklaması zaten checkbox'u toggle eder, sadece style güncelle
+  setTimeout(function(){ toggleCbVasif(cb.dataset.ekid, cb.checked); }, 0);
+});
 </script>
 </body>
 </html>
