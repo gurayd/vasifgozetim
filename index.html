@@ -143,6 +143,12 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
 </style>
 </head>
 <body>
+
+<div id="loading-overlay" style="position:fixed;inset:0;background:#0f1117;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+  <div class="spinner" style="width:36px;height:36px;border-width:3px"></div>
+  <div id="loading-text" style="color:#8899bb;font-size:14px;font-family:inherit">Veriler yükleniyor…</div>
+</div>
+
 <div class="layout">
 
 <!-- SIDEBAR -->
@@ -236,6 +242,7 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
     </div>
   </div>
   <input type="hidden" id="d-id">
+  <input type="hidden" id="d-fid">
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('d','bilgi')">Kişisel Bilgiler</button>
@@ -510,10 +517,138 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
 
 <div id="toast-wrap"></div>
 
+
 <script>
+
 // ══════════════════════════════════════════════════════
-// VERİTABANI (localStorage)
+// SUPABASE REST API
 // ══════════════════════════════════════════════════════
+const SB_URL = "https://tdztotfxagcocjgmzqqt.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkenRvdGZ4YWdjb2NqZ216cXF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1ODY5MDEsImV4cCI6MjA4OTE2MjkwMX0.M2m-I0Q9MOU8-FtyIPcsDgcfGGIVW9A19rvaeQmBADQ";
+const SB_HDR = {"apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json", "Prefer": "return=representation"};
+
+// ── Yardımcılar ───────────────────────────────────────
+function showLoading(show) {
+  const el = document.getElementById('loading-overlay');
+  if(el) el.style.display = show ? 'flex' : 'none';
+}
+function nextId() { return Date.now() + Math.floor(Math.random()*9999); }
+
+// ── Cache ─────────────────────────────────────────────
+const CACHE = {personel:null, vasiflandirmalar:null, egitimler:null, gozetimler:null};
+
+// ── Tablo adı → Supabase tablo adı ───────────────────
+const TBL = {
+  personel:'personel', vasiflandirmalar:'vasiflandirmalar',
+  egitimler:'egitimler', gozetimler:'gozetimler'
+};
+
+// ── Tüm kayıtları çek (sayfalama ile) ─────────────────
+async function sbFetchAll(tbl) {
+  let rows = [], from = 0, size = 1000;
+  while(true) {
+    const r = await fetch(`${SB_URL}/rest/v1/${tbl}?select=*&order=id&offset=${from}&limit=${size}`, {headers: SB_HDR});
+    if(!r.ok) throw new Error((await r.json()).message || r.status);
+    const data = await r.json();
+    rows = rows.concat(data);
+    if(data.length < size) break;
+    from += size;
+  }
+  return rows;
+}
+
+// ── Kayıt ekle ────────────────────────────────────────
+async function sbInsert(tbl, obj) {
+  const body = {...obj};
+  delete body.id;
+  const r = await fetch(`${SB_URL}/rest/v1/${tbl}`, {
+    method:'POST', headers:SB_HDR, body:JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error((await r.json()).message || r.status);
+  const data = await r.json();
+  return Array.isArray(data) ? data[0] : data;
+}
+
+// ── Kayıt güncelle ────────────────────────────────────
+async function sbUpdate(tbl, id, obj) {
+  const body = {...obj}; delete body.id;
+  const r = await fetch(`${SB_URL}/rest/v1/${tbl}?id=eq.${id}`, {
+    method:'PATCH', headers:SB_HDR, body:JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error((await r.json()).message || r.status);
+}
+
+// ── Kayıt sil ─────────────────────────────────────────
+async function sbDelete(tbl, id) {
+  const r = await fetch(`${SB_URL}/rest/v1/${tbl}?id=eq.${id}`, {
+    method:'DELETE', headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
+  });
+  if(!r.ok) throw new Error((await r.json()).message || r.status);
+}
+
+// ── DB API (app logic bunları çağırır) ────────────────
+async function dbLoad(colName) {
+  if(CACHE[colName]) return CACHE[colName];
+  CACHE[colName] = await sbFetchAll(TBL[colName]||colName);
+  return CACHE[colName];
+}
+
+function dbGet(colName) { return CACHE[colName] || []; }
+
+async function dbAdd(colName, item) {
+  const saved = await sbInsert(TBL[colName]||colName, item);
+  if(CACHE[colName]) CACHE[colName].push(saved);
+  return saved;
+}
+
+async function dbUpdate(colName, id, data) {
+  await sbUpdate(TBL[colName]||colName, id, data);
+  if(CACHE[colName]) {
+    const idx = CACHE[colName].findIndex(x=>x.id===id);
+    if(idx>=0) Object.assign(CACHE[colName][idx], data);
+  }
+}
+
+async function dbDelete(colName, id) {
+  await sbDelete(TBL[colName]||colName, id);
+  if(CACHE[colName]) CACHE[colName] = CACHE[colName].filter(x=>x.id!==id);
+}
+
+function dbSet(colName, arr) { CACHE[colName] = arr; }
+
+// ── Uygulama başlatma ─────────────────────────────────
+async function initApp() {
+  showLoading(true);
+  const txt = document.getElementById('loading-text');
+  const steps = [
+    ['personel',         'Personel yükleniyor…'],
+    ['vasiflandirmalar', 'Vasıflandırmalar yükleniyor…'],
+    ['egitimler',        'Eğitimler yükleniyor…'],
+    ['gozetimler',       'Gözetimler yükleniyor…'],
+  ];
+  try {
+    for(const [col, label] of steps) {
+      if(txt) txt.textContent = label;
+      await dbLoad(col);
+    }
+    console.log('Yüklendi →',
+      'personel:'+dbGet('personel').length,
+      'vasif:'+dbGet('vasiflandirmalar').length,
+      'egitim:'+dbGet('egitimler').length,
+      'goz:'+dbGet('gozetimler').length);
+    showLoading(false);
+    showDashboard();
+  } catch(e) {
+    showLoading(false);
+    console.error('Hata:', e);
+    document.body.innerHTML = '<div style="padding:40px;font-family:system-ui;background:#0f1117;color:#e2e8f0;min-height:100vh">'
+      + '<h2 style="color:#ef4444;margin-bottom:12px">⚠ Bağlantı Hatası</h2>'
+      + '<p style="color:#8899bb;margin-bottom:16px">'+e.message+'</p>'
+      + '<button onclick="location.reload()" style="padding:8px 20px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:14px">Tekrar Dene</button></div>';
+  }
+}
+
+// ── STATIC CONSTANTS ─────────────────────────────────
 const SUBELER = ['ADANA ŞUBE','ANKARA ŞUBE','ANTALYA ŞUBE','BURSA ŞUBE','DENİZLİ ŞUBE','DİYARBAKIR ŞUBE','EDİRNE ŞUBE','ESKİŞEHİR ŞUBE','GAZİANTEP ŞUBE','İSTANBUL ŞUBE','İZMİR ŞUBE','KAYSERİ ŞUBE','KOCAELİ ŞUBE','KONYA ŞUBE','MERSİN ŞUBE','SAMSUN ŞUBE','TRABZON ŞUBE','ZONGULDAK ŞUBE'];
 
 const EKIPMANLAR = [
@@ -626,23 +761,10 @@ const EKIPMANLAR = [
 ];
 
 // ── DB helpers ────────────────────────────────────────────────────────
-function dbGet(key, def=[]){ try{ return JSON.parse(localStorage.getItem('akm_'+key))||def; }catch{ return def; } }
-function dbSet(key, val){ localStorage.setItem('akm_'+key, JSON.stringify(val)); }
+// ── APP LOGIC ────────────────────────────────────────
 
-const SEED_PERSONEL = [{"id": 1, "adi_soyadi": "ERGUN ŞENGÖR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 2, "adi_soyadi": "MUSTAFA AKIŞIN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 3, "adi_soyadi": "MELEK MEŞHUR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 4, "adi_soyadi": "AHMET TEKİN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 5, "adi_soyadi": "SONER AKYILDIZ", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 6, "adi_soyadi": "ARİF SERKAN CAN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 7, "adi_soyadi": "HİKMET PEKDUR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 8, "adi_soyadi": "TURGAY ÇAM", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 9, "adi_soyadi": "VOLKAN ERDEM", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 10, "adi_soyadi": "TAYFUN AK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 11, "adi_soyadi": "FATİH EFE ÇİÇEK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 12, "adi_soyadi": "DENİZ FENER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 13, "adi_soyadi": "AYDIN RODOPLU", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 14, "adi_soyadi": "ZAFER TAŞKESEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 15, "adi_soyadi": "OZAN ŞENLİK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 16, "adi_soyadi": "HASAN YAMAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 17, "adi_soyadi": "AYBERK YILDIRIM", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 18, "adi_soyadi": "İLKER ÖZCAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 19, "adi_soyadi": "İBRAHİM KÜÇÜKAÇIL", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 20, "adi_soyadi": "ERDİNÇ KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 21, "adi_soyadi": "ZAFER TUĞCU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 22, "adi_soyadi": "MUSTAFA KARACA", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 23, "adi_soyadi": "BUKET ALEV KILIÇ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 24, "adi_soyadi": "KAAN ÖZTEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 25, "adi_soyadi": "TUNCAY KAYA", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 26, "adi_soyadi": "MUTLU TAŞTAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 27, "adi_soyadi": "ETHEM KAYHAN KAYMAKÇI", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 28, "adi_soyadi": "ÖZCAN GÜLSÜM", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 29, "adi_soyadi": "GÜLÜSTAN ÇITAK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 30, "adi_soyadi": "TANER IRMAK", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 31, "adi_soyadi": "ALPER TOPÇU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 32, "adi_soyadi": "ÖMER NACİ GÜLEN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 33, "adi_soyadi": "YUSUF BOSTAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 34, "adi_soyadi": "BORA FIRINCI", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 35, "adi_soyadi": "EMRE BAYRAT", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 36, "adi_soyadi": "MAHMUT ÖZER", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 37, "adi_soyadi": "BEKİR TUNÇ", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 38, "adi_soyadi": "ISTEPAN İLHAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 39, "adi_soyadi": "FEVZİYE DİDEM ÖZDOĞAN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 40, "adi_soyadi": "FATMA GÜNEŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 41, "adi_soyadi": "ERKAN SÜTPINAR", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 42, "adi_soyadi": "SERDAR SÖNMEZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 43, "adi_soyadi": "ERKAN TÜRKMEN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 44, "adi_soyadi": "ÖMER KOÇAĞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 45, "adi_soyadi": "HASAN KÜTÜK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 46, "adi_soyadi": "ALİ EMRAH ERDOĞAN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 47, "adi_soyadi": "HAYATİ ÇAKIR", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 48, "adi_soyadi": "ALPER TOSUN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 49, "adi_soyadi": "BURAK DEMİRCAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 50, "adi_soyadi": "DENİZ BERBEROĞLU GÜMÜŞ", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 51, "adi_soyadi": "SEMİH HAZİNECİ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 52, "adi_soyadi": "MEHMET AKCAN", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 53, "adi_soyadi": "MUSTAFA LEVENT ŞAM", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 54, "adi_soyadi": "NURİ ÇETİN", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 55, "adi_soyadi": "CAFER ARSLAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 56, "adi_soyadi": "TUNA GÖNÜLLÜ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 57, "adi_soyadi": "VOLKAN İNAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 58, "adi_soyadi": "ATİLLA ÇİÇEK", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 59, "adi_soyadi": "VEYSEL KAHRAMAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 60, "adi_soyadi": "NURİ EGEMEN YILMAZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 61, "adi_soyadi": "İLKER KÜPELİ", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 62, "adi_soyadi": "SERAP COŞKUN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 63, "adi_soyadi": "EYLEM MUTLU", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 64, "adi_soyadi": "İLYAS BATBAY", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 65, "adi_soyadi": "ESİN ERHAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 66, "adi_soyadi": "BÜLENT ÇETİNKAYA", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 67, "adi_soyadi": "NURETTİN BİLEN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 68, "adi_soyadi": "TARIK ALTUN", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 69, "adi_soyadi": "NERİMAN ŞİMŞEK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 70, "adi_soyadi": "GÜLRU TOPÇU", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 71, "adi_soyadi": "ALİ GÖKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 72, "adi_soyadi": "MEHMET KARACAOĞLU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 73, "adi_soyadi": "MERT SÜMBÜL", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 74, "adi_soyadi": "ÇİÇEK ŞİMŞEK YILDIZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 75, "adi_soyadi": "BAHRİ BUĞRA ÇEKİN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 76, "adi_soyadi": "NİYAZİ OĞUZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 77, "adi_soyadi": "BURHAN ÖZER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 78, "adi_soyadi": "OKAN SÜREN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 79, "adi_soyadi": "ÖMER AYDIN ONOVLUK", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 80, "adi_soyadi": "TOLGA SÜTEKİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 81, "adi_soyadi": "ALİ DEĞİRMEN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 82, "adi_soyadi": "KUTLU BEYAZIT", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 83, "adi_soyadi": "YÜCEL KÜRKLÜ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 84, "adi_soyadi": "ADNAN KAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 85, "adi_soyadi": "SERHAN GENÇOĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 86, "adi_soyadi": "TAYLAN BALLI", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 87, "adi_soyadi": "HAMZA YALÇIN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 88, "adi_soyadi": "FATİH ŞANLI", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 89, "adi_soyadi": "AHMET TURAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 90, "adi_soyadi": "SEYİT BİLKAY", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 91, "adi_soyadi": "GÜRAY DİNSEL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 92, "adi_soyadi": "ÇAĞRI DEMİR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 93, "adi_soyadi": "UĞUR GÖRÜŞ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 94, "adi_soyadi": "DENİZ ÇELİK", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 95, "adi_soyadi": "VELİ ÇALIŞKAN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 96, "adi_soyadi": "ŞABAN KAYA", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 97, "adi_soyadi": "SEMİH BEKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 98, "adi_soyadi": "VOLKAN BULUT", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 99, "adi_soyadi": "SÜLEYMAN ŞAFAK GÜNAY", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 100, "adi_soyadi": "SALİM AKGÜL", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 101, "adi_soyadi": "MANSUR ATAŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 102, "adi_soyadi": "HALİL MURAT KOÇAK", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 103, "adi_soyadi": "SERKAN AHMET ÇAM", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 104, "adi_soyadi": "HAKAN KÖSEOĞLU", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 105, "adi_soyadi": "RAMADAN KORKMAZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 106, "adi_soyadi": "MÜSLÜM ŞAHİN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 107, "adi_soyadi": "BURAK KIRALAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 108, "adi_soyadi": "İBRAHİM KILAVUZ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 109, "adi_soyadi": "ŞÜKRÜ TİMUR", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 110, "adi_soyadi": "GÖKHAN KÖKSAL", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 111, "adi_soyadi": "ENGİN KOYUN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 112, "adi_soyadi": "DOĞUŞ ZAFER BAĞLAMA", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 113, "adi_soyadi": "HASAN GERİLAKAN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 114, "adi_soyadi": "ONUR SARI", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 115, "adi_soyadi": "SEVDA ÖZAY ÖZER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 116, "adi_soyadi": "İSMAİL DAL", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 117, "adi_soyadi": "SAVAŞ KOCAKAYA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 118, "adi_soyadi": "HAKAN DEMİRKIR", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 119, "adi_soyadi": "TAHSİN KARAARSLAN", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 120, "adi_soyadi": "METİN ŞANAL", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 121, "adi_soyadi": "HASAN YILMAZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 122, "adi_soyadi": "OSMAN SAMET ÖZDEMİR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 123, "adi_soyadi": "BURAK DOĞAN", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 124, "adi_soyadi": "DURDU MEHMET KARADEMİR", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 125, "adi_soyadi": "ÖMER YANDO", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 126, "adi_soyadi": "ALİ CAN YOLDAŞ", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 127, "adi_soyadi": "MERT AKKOÇOĞLU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 128, "adi_soyadi": "EMRAH NALBANT", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 129, "adi_soyadi": "UMUT AYDIN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 130, "adi_soyadi": "MURAT AYDIN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 131, "adi_soyadi": "KASIM TUFAN TURAL", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 132, "adi_soyadi": "MUTLU İRFAN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 133, "adi_soyadi": "CEVDET ŞENER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 134, "adi_soyadi": "YİĞİT GÖKELMA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 135, "adi_soyadi": "BURAK GENÇ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 136, "adi_soyadi": "ATAKAN ÇOLAK", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 137, "adi_soyadi": "MAHPERİ ÖNCEL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 138, "adi_soyadi": "MEHMET SABRİ BAYSAL", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 139, "adi_soyadi": "BİLAL ALPER ÇİZMECİ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 140, "adi_soyadi": "SERCAN ZEREYALP", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 141, "adi_soyadi": "SÜHA SERGİN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 142, "adi_soyadi": "ERSİN YILDIRIM", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 143, "adi_soyadi": "ALPASLAN GÜVEN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 144, "adi_soyadi": "SERVET ÖZTÜRK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 145, "adi_soyadi": "UĞUR TOPALOĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 146, "adi_soyadi": "İBRAHİM ALİ KAYA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 147, "adi_soyadi": "ULAŞ RECEP DURBAŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 148, "adi_soyadi": "SERÇİN ÜÇKARDEŞ", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 149, "adi_soyadi": "ZEKİ ÇAVAN", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 150, "adi_soyadi": "ERDİNÇ ORTAKÇI", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 151, "adi_soyadi": "ENGİN MERİÇ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 152, "adi_soyadi": "TARIK AYZİT", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 153, "adi_soyadi": "MUHAMMET ÖZER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 154, "adi_soyadi": "İSMAİL OĞULCAN KALENDER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 155, "adi_soyadi": "CANER SOYKÖK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 156, "adi_soyadi": "HOZAN ÇETİNKAYA", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 157, "adi_soyadi": "TÜLİN DUNAY", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 158, "adi_soyadi": "İSMAİL ŞAHİN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 159, "adi_soyadi": "CAN EYRAN KÖSEOĞLU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 160, "adi_soyadi": "BEREKET BOZOĞLAN", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 161, "adi_soyadi": "SERCAN ÇAKMAK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 162, "adi_soyadi": "DORUK GÜNDOĞDU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 163, "adi_soyadi": "HASAN ALİ KOÇTÜRK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 164, "adi_soyadi": "ÖZGE ÖZTÜRK", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 165, "adi_soyadi": "YAĞIZCAN HOTAMIŞ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 166, "adi_soyadi": "BURAK CENGİZ", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 167, "adi_soyadi": "FURKAN HIZAR", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 168, "adi_soyadi": "ŞEYMA BELİNA ÖZBEK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 169, "adi_soyadi": "MEHMET ALİ ATAHAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 170, "adi_soyadi": "YUSUF KUMUŞ", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 171, "adi_soyadi": "EVREN AKYÜZ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 172, "adi_soyadi": "EGEMEN KORKMAZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 173, "adi_soyadi": "EMRAH SİNAN KOÇ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 174, "adi_soyadi": "BAYRAM ŞEKER", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 175, "adi_soyadi": "DENİZ SAYGIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 176, "adi_soyadi": "AHMET BİCAN KARACA", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 177, "adi_soyadi": "COŞKUN İLTER", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 178, "adi_soyadi": "BUĞRA KAAN TOSUN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 179, "adi_soyadi": "ONUR ÖZDEMİR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 180, "adi_soyadi": "ŞABAN AKBABA", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 181, "adi_soyadi": "SERKAN KAPICI", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 182, "adi_soyadi": "SAMET DOĞAN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 183, "adi_soyadi": "BURAK AKKUŞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 184, "adi_soyadi": "SELİN SİLCAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 185, "adi_soyadi": "BURCU KIRLI", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 186, "adi_soyadi": "ULAŞ KARAKAYA", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 187, "adi_soyadi": "DOĞUKAN GÖKTÜRK MEZDA", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 188, "adi_soyadi": "SEVİNÇ GÜNGÖR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 189, "adi_soyadi": "UTKU BIÇAKCI", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 190, "adi_soyadi": "HÜSEYİN KARAKURT", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 191, "adi_soyadi": "TOLGAHAN KILIÇ", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 192, "adi_soyadi": "ENGİN ÖZGÜN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 193, "adi_soyadi": "UĞUR EKTİ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 194, "adi_soyadi": "EMRE ENGÜR", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 195, "adi_soyadi": "BURAKCAN ŞIK", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 196, "adi_soyadi": "ÖMER FARUK ŞİRİN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 197, "adi_soyadi": "ÖMER TEKİNALP", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 198, "adi_soyadi": "UMUT GÜMÜŞ", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 199, "adi_soyadi": "MUSTAFA ERDEM KIRAĞASI", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 200, "adi_soyadi": "ÇAĞATAY RÜŞTÜ ERTÜRK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 201, "adi_soyadi": "NURULLAH SAKA", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 202, "adi_soyadi": "GÖKHAN HÜSEYİN CİRİT", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 203, "adi_soyadi": "İHSAN KILIÇ", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 204, "adi_soyadi": "EDA ÖZDEMİR", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 205, "adi_soyadi": "ŞEYMA ŞİMŞEK AYDIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 206, "adi_soyadi": "KAAN KULAKSIZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 207, "adi_soyadi": "FIRAT ŞEKER", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 208, "adi_soyadi": "AHMET HALUK OYMAK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 209, "adi_soyadi": "KAZIM YILDIZ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 210, "adi_soyadi": "MURAT OLGUN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 211, "adi_soyadi": "FEYYAZ ZARALI", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 212, "adi_soyadi": "FİKRET GÜNDÜZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 213, "adi_soyadi": "KAYHAN ŞENÖNDER", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 214, "adi_soyadi": "ZEHRA GÜRCÜOĞLU", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 215, "adi_soyadi": "UZAY ÖZKAN", "irtibat_sube": "SAMSUN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 216, "adi_soyadi": "FATİH TURAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 217, "adi_soyadi": "KEMAL GENÇ", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 218, "adi_soyadi": "FURKAN BULUT", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 219, "adi_soyadi": "MUHAMMED YILDIRIM", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 220, "adi_soyadi": "FIRAT ÇELEN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 221, "adi_soyadi": "MUSA CİVAROĞLU", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 222, "adi_soyadi": "DENİZ CAN EVRAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 223, "adi_soyadi": "ARİF KAYA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 224, "adi_soyadi": "SERCAN AYHAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 225, "adi_soyadi": "MÜCAHİD TUĞRUL GÖK", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 226, "adi_soyadi": "BERK CAN AKDEMİR", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 227, "adi_soyadi": "GÖKER GÖKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 228, "adi_soyadi": "SERMET KEMAL TİRYAKİOĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 229, "adi_soyadi": "TAYFUN BALKAYA", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 230, "adi_soyadi": "ALİ METEHAN GEÇEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 231, "adi_soyadi": "AHMET ERGÜVEN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 232, "adi_soyadi": "YUSUF GÖLBAŞI", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 233, "adi_soyadi": "FERZAN DORUK AYÇİÇEK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 234, "adi_soyadi": "MUSTAFA BOZDAĞ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 235, "adi_soyadi": "YALÇIN DERELİ", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 236, "adi_soyadi": "DOĞAN KILIÇ", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 237, "adi_soyadi": "ALİ SEÇKİN KILIÇ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 238, "adi_soyadi": "BEYZA BEHLÜL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 239, "adi_soyadi": "BURAK HAMDİ TAŞKIRAN", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 240, "adi_soyadi": "CİHAN DOMBAYCI", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 241, "adi_soyadi": "TUNCER GÜL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 242, "adi_soyadi": "KAMİL YAPAR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 243, "adi_soyadi": "BUSE KURU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 244, "adi_soyadi": "ENES ÇAVUŞLAR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 245, "adi_soyadi": "MEHMET ŞİMŞEK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 246, "adi_soyadi": "ŞAFAK YALÇIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 247, "adi_soyadi": "NECMİ VARLIK", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 248, "adi_soyadi": "PELİN EREN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 249, "adi_soyadi": "BERKAN SÖNMEZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 250, "adi_soyadi": "HÜSEYİN ALAŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 251, "adi_soyadi": "BURHAN KESKİN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 252, "adi_soyadi": "BARAN ÖNCAN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 253, "adi_soyadi": "HÜSEYİN BAYRAKTAR", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 254, "adi_soyadi": "BURAK YILDIZ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 255, "adi_soyadi": "ADEM KARAMAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 256, "adi_soyadi": "ALİ ONUR TEKİN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 257, "adi_soyadi": "SERCAN ÖZER", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 258, "adi_soyadi": "KADİRCAN GÖK", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 259, "adi_soyadi": "SULTAN KANAT", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 260, "adi_soyadi": "FATİH SÖNMEZ", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 261, "adi_soyadi": "VOLKAN CANAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 262, "adi_soyadi": "UFUK KARABACAK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 263, "adi_soyadi": "ANIL KOÇ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 264, "adi_soyadi": "AYBERK YILMAZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 265, "adi_soyadi": "TAYLAN KARASOY", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 266, "adi_soyadi": "BÜLENT GÖKSÜLÜK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 267, "adi_soyadi": "UMUT CAN MEŞELİ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 268, "adi_soyadi": "AHMET ARMAĞAN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 269, "adi_soyadi": "UĞUR ZAL", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 270, "adi_soyadi": "SONER OĞULCAN ALAN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 271, "adi_soyadi": "SERDAR ÖZBEK", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 272, "adi_soyadi": "ALP KOCAOĞLU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 273, "adi_soyadi": "UĞUR GÜMÜŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 274, "adi_soyadi": "ÖMER ÖNDER", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 275, "adi_soyadi": "AYŞENUR DEMİRCAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 276, "adi_soyadi": "SİNAN ÖNGÖR", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 277, "adi_soyadi": "ÇAĞLAR BEYDOĞAN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 278, "adi_soyadi": "AHMET CAN URA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 279, "adi_soyadi": "UGUR ÇITRIK", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 280, "adi_soyadi": "VOLKAN ÇALIŞKAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 281, "adi_soyadi": "SALİH KAPANŞAHİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 282, "adi_soyadi": "ALİ CEM TERCANLI", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 283, "adi_soyadi": "ERDEM BERKAN", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 284, "adi_soyadi": "EREN DENİZ KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 285, "adi_soyadi": "SERCAN ALÇINKAYA", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 286, "adi_soyadi": "ABDULLAH TURAN KOŞAN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 287, "adi_soyadi": "MUSTAFA KAAN DÜLGER", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 288, "adi_soyadi": "MEHMET ALİ AKGÜL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 289, "adi_soyadi": "ALİ ARAP", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 290, "adi_soyadi": "SİNAN KARAKAYA", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 291, "adi_soyadi": "HAKAN GENÇOĞLU", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 292, "adi_soyadi": "GÖKHAN GÜL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 293, "adi_soyadi": "SEZER KÜÇÜK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 294, "adi_soyadi": "AHMET BATUHAN CEM AKAR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 295, "adi_soyadi": "TUNAHAN SEMİZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 296, "adi_soyadi": "MUHAMMED MUSTAFA ATMACA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 297, "adi_soyadi": "ZEYNEP LİZGE EVCİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 298, "adi_soyadi": "EZGİ MASTAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 299, "adi_soyadi": "BAHAR ÜSTÜNER", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 300, "adi_soyadi": "AZİZ SAFİ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 301, "adi_soyadi": "ALİ UĞURALP SINMAZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 302, "adi_soyadi": "HÜSNÜCAN KILINÇ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 303, "adi_soyadi": "ANIL YÖRÜMEZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 304, "adi_soyadi": "ALİ AYDIN CAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 305, "adi_soyadi": "TANER YILMAZ", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 306, "adi_soyadi": "EMRE KUŞCU", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 307, "adi_soyadi": "KEREM TINKIR", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 308, "adi_soyadi": "AYHAN DEMİR", "irtibat_sube": "ZONGULDAK ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 309, "adi_soyadi": "FATİH BÜYÜKYILMAZ", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 310, "adi_soyadi": "AHMET EMİN GEYİK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 311, "adi_soyadi": "SAMET ALTIN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 312, "adi_soyadi": "FARUK ARSLAN", "irtibat_sube": "TRABZON ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 313, "adi_soyadi": "MUHAMMED VEYSİ ÇELİK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 314, "adi_soyadi": "KEMAL AKGÜN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 315, "adi_soyadi": "ALPER İYİSEN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 316, "adi_soyadi": "ÇAĞATAY ALPARSLAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 317, "adi_soyadi": "OLCAY SUCUK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 318, "adi_soyadi": "MUSTAFA MELİH YÜKSEKTEPE", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 319, "adi_soyadi": "EMRE YALÇIN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 320, "adi_soyadi": "FERİT KOPARIR", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 321, "adi_soyadi": "MİNE PINAR İLHAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 322, "adi_soyadi": "ESİN KARACA MANSUROĞLU", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 323, "adi_soyadi": "ÖMER ŞAHAN", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 324, "adi_soyadi": "ABDULLAH ŞENGÖR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 325, "adi_soyadi": "OZAN DENİZ KARADAĞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 326, "adi_soyadi": "HASAN KARAÇELİK", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 327, "adi_soyadi": "NUR SENA DURMAZ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 328, "adi_soyadi": "AHMET UYSAL", "irtibat_sube": "KONYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 329, "adi_soyadi": "CAN SAYIN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 330, "adi_soyadi": "YUNUSCAN TOPALOĞLU", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 331, "adi_soyadi": "ALİ BALCI", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 332, "adi_soyadi": "BAHAR SULTAN AYDINER", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 333, "adi_soyadi": "HATİCE NARİN İŞLER", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 334, "adi_soyadi": "BARIŞ ŞEKEROL", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 335, "adi_soyadi": "İSMAİL AKÇAY", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 336, "adi_soyadi": "HANDE ER YEŞİLDAĞ", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 337, "adi_soyadi": "MERT SEFA BAYAM", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 338, "adi_soyadi": "EBRU METİN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 339, "adi_soyadi": "BURAK CEVİZLİ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 340, "adi_soyadi": "SİBEL DİŞLİ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 341, "adi_soyadi": "SİNAN BAKIN", "irtibat_sube": "EDİRNE ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 342, "adi_soyadi": "BERK AKKIZ", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 343, "adi_soyadi": "HAKAN BAYRAM", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 344, "adi_soyadi": "BARIŞ TOPAÇ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 345, "adi_soyadi": "NAİL KÖRPE", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 346, "adi_soyadi": "MİRAÇ ŞAHİN", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 347, "adi_soyadi": "OSMAN KÖSE", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 348, "adi_soyadi": "ENES CAN", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 349, "adi_soyadi": "SÜLEYMAN HİLMİ DUT", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 350, "adi_soyadi": "ALİ KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 351, "adi_soyadi": "ARMAN KAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 352, "adi_soyadi": "FIRAT GELDİ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 353, "adi_soyadi": "FURKAN ÜNAL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 354, "adi_soyadi": "OLCAY GÜRBÜZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 355, "adi_soyadi": "ÖZGÜL KIRATLI", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 356, "adi_soyadi": "UFUK ÇELİK", "irtibat_sube": "BURSA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 357, "adi_soyadi": "BATUHAN TAŞÇI", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 358, "adi_soyadi": "SELAHATTİN ALP GÜNAYDIN", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 359, "adi_soyadi": "ONUR ÖĞÜL", "irtibat_sube": "KOCAELİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 360, "adi_soyadi": "FURKAN ORHAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 361, "adi_soyadi": "ŞERVAN KÜREKEN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 362, "adi_soyadi": "ÖMER FARUK DEMİRBÜKEN", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 363, "adi_soyadi": "CAN TAMER SAYLAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 364, "adi_soyadi": "FURKAN YARDIMCI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 365, "adi_soyadi": "HASAN SEMİH DOĞAN", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 366, "adi_soyadi": "YASİN MERT DABANLI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 367, "adi_soyadi": "TOLGA KARAKUZU", "irtibat_sube": "DENİZLİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 368, "adi_soyadi": "EZGİ SERT", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 369, "adi_soyadi": "OĞUZ DESTAN MEŞE", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 370, "adi_soyadi": "ORKUN DURUKAN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 371, "adi_soyadi": "ALİ EFE GENCER", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 372, "adi_soyadi": "BURAK YILMAZ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 373, "adi_soyadi": "HÜSEYİNCAN ÖZDEMİR", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 374, "adi_soyadi": "MEHMET ALİ YILDIRIM", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 375, "adi_soyadi": "OZAN ÇEVİK", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 376, "adi_soyadi": "ŞAHİN VURAL KON", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 377, "adi_soyadi": "MELİH ADIGÜZEL", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 378, "adi_soyadi": "ATAKAN ATAOĞLU", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 379, "adi_soyadi": "ÇEGAVERA ŞIK", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 380, "adi_soyadi": "BERKE ARDA SAY", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 381, "adi_soyadi": "NURKAN TOSUN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 382, "adi_soyadi": "HALİT ORÇUN TURAN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 383, "adi_soyadi": "HASRET GÖRKEM DELİKTAŞ", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 384, "adi_soyadi": "SONAY USTABAŞ YILMAZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 385, "adi_soyadi": "EMRE KISA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 386, "adi_soyadi": "İSMAİL CAN AKTAŞLI", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 387, "adi_soyadi": "ENİS YILMAZ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 388, "adi_soyadi": "YUNUS SAMET YILMAZ", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 389, "adi_soyadi": "BULUT TEKE", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 390, "adi_soyadi": "KARDELEN DEMİRTAŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 391, "adi_soyadi": "ÜNAL BİRKAN ALTUN", "irtibat_sube": "GAZİANTEP ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 392, "adi_soyadi": "MEHMET ROJ BARAN ÇELİK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 393, "adi_soyadi": "KAANHAN DURAK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 394, "adi_soyadi": "BARIŞ ELİBÜYÜK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 395, "adi_soyadi": "MERT KARAOĞLU", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 396, "adi_soyadi": "ONUR ÖZBEK", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 397, "adi_soyadi": "YİĞİT ERDOĞAN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 398, "adi_soyadi": "SAMET ALKAN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 399, "adi_soyadi": "MERT AVŞAR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 400, "adi_soyadi": "HÜSEYİN MERT SARIKAYA", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 401, "adi_soyadi": "ATILIM KABADAYI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 402, "adi_soyadi": "ŞİLEM BALKIS", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 403, "adi_soyadi": "KARAHAN ŞENSOY", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 404, "adi_soyadi": "HALİS CAN SALTAN", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 405, "adi_soyadi": "İBRAHİM AKIŞ", "irtibat_sube": "ANTALYA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 406, "adi_soyadi": "SEDANUR COŞKUN", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 407, "adi_soyadi": "BEKİR KALENDER", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 408, "adi_soyadi": "NESLİHAN PAKMA", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 409, "adi_soyadi": "METEHAN SAKARYA", "irtibat_sube": "KAYSERİ ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 410, "adi_soyadi": "MUSTAFA AYDIN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 411, "adi_soyadi": "MEHMET NURİ ÖZMEN", "irtibat_sube": "MERSİN ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 412, "adi_soyadi": "ÇAĞDAŞ UÇAR", "irtibat_sube": "ADANA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 413, "adi_soyadi": "MUSTAFA BERK BÜYÜKBAŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 414, "adi_soyadi": "AHMET OĞUZ AKÇA", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 415, "adi_soyadi": "SAMET ARSLAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 416, "adi_soyadi": "DİDEM ŞAHİN", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 417, "adi_soyadi": "MERT SARIGÜL", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 418, "adi_soyadi": "BARAN KAYA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 419, "adi_soyadi": "HÜSEYİN CANER KARADİŞ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 420, "adi_soyadi": "YUNUS EMRE DEMİREL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 421, "adi_soyadi": "MURAT CAN ARAS", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 422, "adi_soyadi": "HATİP BARAN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 423, "adi_soyadi": "HAMZA ÖNEN", "irtibat_sube": "DİYARBAKIR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 424, "adi_soyadi": "ALEYNA EDA AKSOY", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 425, "adi_soyadi": "ONUR ERSÖZ MERCAN", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 426, "adi_soyadi": "DOĞUKAN TEMEL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 427, "adi_soyadi": "ASIM CAN LEKESİZ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 428, "adi_soyadi": "HALİL KIZILAĞAÇ", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 429, "adi_soyadi": "SEMİH SAĞLAM", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 430, "adi_soyadi": "UFUK KIZILKAYA", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 431, "adi_soyadi": "EMRE KILIÇ", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 432, "adi_soyadi": "CAN FERHAN KALAYCI", "irtibat_sube": "ESKİŞEHİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 433, "adi_soyadi": "BERFİN ACAR", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 434, "adi_soyadi": "SERHAT YILDIRIM", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 435, "adi_soyadi": "UMUTCAN USLU", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 436, "adi_soyadi": "EMİRCAN GÜL", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 437, "adi_soyadi": "SERHAT DEĞERMENCİ", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 438, "adi_soyadi": "KEMAL ULAŞ GÖLPUNAR", "irtibat_sube": "ANKARA ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 439, "adi_soyadi": "ROHAT ALİŞ AYAS", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 440, "adi_soyadi": "ALPEREN CORUK", "irtibat_sube": "İSTANBUL ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}, {"id": 441, "adi_soyadi": "TARIK ÖZDEMİR", "irtibat_sube": "İZMİR ŞUBE", "calisma_durumu": "Aktif", "kurulusdaki_gorevi": "Muayene Personeli"}];
 
-function initDB(){
-  if(!localStorage.getItem('akm_inited')){
-    dbSet('personel', SEED_PERSONEL);
-    dbSet('vasiflandirmalar', []);
-    dbSet('egitimler', []);
-    dbSet('gozetimler', []);
-    dbSet('nextid', 491);
-    localStorage.setItem('akm_inited','1');
-  }
-}
-
-function nextId(){ const n=dbGet('nextid',1); dbSet('nextid', n+1); return n; }
+// initDB ve nextId Supabase layer'da tanımlı
 
 // ── ROUTING ───────────────────────────────────────────────────────────
 let _page = 'dashboard';
@@ -818,30 +940,27 @@ function openAddPersonel(){
   openModal('m-personel');
 }
 
-function savePersonel(){
+async function savePersonel(){
   const ad = document.getElementById('mp-adi_soyadi').value.trim();
   if(!ad){ toast('Ad Soyad zorunlu','err'); return; }
   const p = {
-    id: nextId(),
-    adi_soyadi: ad,
-    irtibat_sube: document.getElementById('mp-irtibat_sube').value,
-    temsilcilik: document.getElementById('mp-temsilcilik').value,
-    oda_sicil_no: document.getElementById('mp-oda_sicil_no').value,
-    tc_kimlik_no: document.getElementById('mp-tc_kimlik_no').value,
-    cep_tel: document.getElementById('mp-cep_tel').value,
-    email: document.getElementById('mp-email').value,
-    meslegi: document.getElementById('mp-meslegi').value,
-    kurulusdaki_gorevi: document.getElementById('mp-kurulusdaki_gorevi').value,
-    calisma_durumu: document.getElementById('mp-calisma_durumu').value,
+    adi_soyadi:ad,
+    irtibat_sube:document.getElementById('mp-irtibat_sube').value,
+    temsilcilik:document.getElementById('mp-temsilcilik').value,
+    oda_sicil_no:document.getElementById('mp-oda_sicil_no').value,
+    tc_kimlik_no:document.getElementById('mp-tc_kimlik_no').value,
+    cep_tel:document.getElementById('mp-cep_tel').value,
+    email:document.getElementById('mp-email').value,
+    meslegi:document.getElementById('mp-meslegi').value,
+    kurulusdaki_gorevi:document.getElementById('mp-kurulusdaki_gorevi').value,
+    calisma_durumu:document.getElementById('mp-calisma_durumu').value,
   };
-  const list = dbGet('personel');
-  list.push(p);
-  dbSet('personel', list);
-  closeModal('m-personel');
-  toast('Personel eklendi');
+  await dbAdd('personel', p);
+  closeModal('m-personel'); toast('Personel eklendi');
   renderPersonelTable();
-  showDashboard(); // refresh stats then come back
-  showPersonel({sube:_currentSube});
+  const allP = dbGet('personel');
+  document.getElementById('s-personel').textContent = allP.length;
+  document.getElementById('s-aktif').textContent = allP.filter(x=>x.calisma_durumu==='Aktif').length;
 }
 
 function fillSubeSelect(selectId){
@@ -864,12 +983,13 @@ const D_FIELDS = ['adi_soyadi','temsilcilik','oda_sicil_no','tc_kimlik_no','dogu
   'mobis_asansor_yetki_tarihi','mobis_asansor_yetki_dusurulme_tarihi'];
 
 function showDetay(id, mode='view'){
-  const p = dbGet('personel').find(x=>x.id===id);
+  const p = dbGet('personel').find(x=>x.id===id||x.id===parseInt(id));
   if(!p){ toast('Personel bulunamadı','err'); return; }
   document.getElementById('tb-title').textContent = 'Personel Detay';
   document.getElementById('tb-crumb').textContent = p.adi_soyadi;
   document.getElementById('d-adi').textContent = p.adi_soyadi;
-  document.getElementById('d-id').value = id;
+  document.getElementById('d-id').value = p?.id||id;
+  document.getElementById('d-fid').value = p?.id||'';
   fillSubeSelect('d-irtibat_sube');
   document.getElementById('d-irtibat_sube').value = p.irtibat_sube||'';
   D_FIELDS.forEach(f=>{ const el=document.getElementById('d-'+f); if(el) el.value = p[f]||''; });
@@ -888,31 +1008,33 @@ function editModeOn(){
   document.getElementById('d-btn-save').style.display='';
 }
 
-function saveDetay(){
-  const id = parseInt(document.getElementById('d-id').value);
-  const list = dbGet('personel');
-  const idx = list.findIndex(p=>p.id===id);
-  if(idx<0){ toast('Kayıt bulunamadı','err'); return; }
-  D_FIELDS.forEach(f=>{ const el=document.getElementById('d-'+f); if(el) list[idx][f]=el.value; });
-  list[idx].irtibat_sube = document.getElementById('d-irtibat_sube').value;
-  dbSet('personel', list);
+async function saveDetay(){
+  const pid = parseInt(document.getElementById('d-id').value)||parseInt(document.getElementById('d-fid').value);
+  const updates = {irtibat_sube:document.getElementById('d-irtibat_sube').value};
+  ['adi_soyadi','temsilcilik','oda_sicil_no','tc_kimlik_no','dogum_tarihi','kan_grubu','mezuniyet_yili',
+   'cep_tel','email','meslegi','kurulusdaki_gorevi','calisma_durumu','calisma_turu','aciklama',
+   'akm_sozlesme_tarihi','sgk_giris_tarihi','sgk_cikis_tarihi','onceki_kurulus','is_deneyimi',
+   'sube_birimi','ek_aciklama','qdms_yetki_tarihi','qdms_yetki_dusurulme_tarihi',
+   'asansor_yazilim_yetki_tarihi','asansor_yazilim_yetki_dusurulme_tarihi',
+   'pk_yazilim_yetki_tarihi','pk_yazilim_yetki_dusurulme_tarihi',
+   'mobis_asansor_yetki_tarihi','mobis_asansor_yetki_dusurulme_tarihi'
+  ].forEach(f=>{const el=document.getElementById('d-'+f);if(el)updates[f]=el.value;});
+  await dbUpdate('personel', pid, updates);
+  const p = dbGet('personel').find(x=>x.id===pid);
+  if(p) Object.assign(p, updates);
   toast('Kaydedildi');
   document.querySelectorAll('#page-detay .form-control').forEach(el=>el.disabled=true);
   document.getElementById('d-btn-edit').style.display='';
   document.getElementById('d-btn-save').style.display='none';
-  document.getElementById('d-adi').textContent = list[idx].adi_soyadi;
-  document.getElementById('tb-crumb').textContent = list[idx].adi_soyadi;
+  document.getElementById('d-adi').textContent = updates.adi_soyadi||'';
+  document.getElementById('tb-crumb').textContent = updates.adi_soyadi||'';
 }
 
-function deletePersonel(){
-  const id = parseInt(document.getElementById('d-id').value);
+async function deletePersonel(){
+  const pid = parseInt(document.getElementById('d-id').value);
   if(!confirm('Bu personel ve tüm kayıtları silinecek. Emin misiniz?')) return;
-  dbSet('personel', dbGet('personel').filter(p=>p.id!==id));
-  dbSet('vasiflandirmalar', dbGet('vasiflandirmalar').filter(v=>v.personel_id!==id));
-  dbSet('egitimler', dbGet('egitimler').filter(e=>e.personel_id!==id));
-  dbSet('gozetimler', dbGet('gozetimler').filter(g=>g.personel_id!==id));
-  toast('Personel silindi');
-  geriGit();
+  await dbDelete('personel', pid);
+  toast('Personel silindi'); geriGit();
 }
 
 // ── EĞİTİM ───────────────────────────────────────────────────────────
@@ -941,21 +1063,22 @@ function openAddEgitim(){
   openModal('m-egitim');
 }
 
-function saveEgitim(){
-  const pid = parseInt(document.getElementById('d-id').value);
+async function saveEgitim(){
+  const pid = parseInt(document.getElementById('d-id').value)||_vasifPid;
   const e = {
-    id: nextId(), personel_id: pid,
-    tarih: document.getElementById('eg-tarih').value,
-    yer: document.getElementById('eg-yer').value,
-    egitmen: document.getElementById('eg-egitmen').value,
-    vasif_yer: document.getElementById('eg-vasif_yer').value,
-    gozlemci: document.getElementById('eg-gozlemci').value,
-    goz_rapor: document.getElementById('eg-goz_rapor').value,
-    bel_kurul: document.getElementById('eg-bel_kurul').value,
-    atama: document.getElementById('eg-atama').value,
+    vasif_id:_activeVasifId, personel_id:pid,
+    tarih:document.getElementById('eg-tarih').value,
+    yer:document.getElementById('eg-yer').value,
+    egitmen:document.getElementById('eg-egitmen').value,
+    vasif_yer:document.getElementById('eg-vasif_yer').value,
+    gozlemci:document.getElementById('eg-gozlemci').value,
+    goz_rapor:document.getElementById('eg-goz_rapor').value,
+    bel_kurul:document.getElementById('eg-bel_kurul').value,
+    atama:document.getElementById('eg-atama').value,
   };
-  const list = dbGet('egitimler'); list.push(e); dbSet('egitimler', list);
-  closeModal('m-egitim'); toast('Eğitim eklendi'); renderEgitimler();
+  await dbAdd('egitimler', e);
+  closeModal('m-egitim'); toast('Eğitim eklendi');
+  refreshEkipCard(_activeVasifId);
 }
 
 function delEgitim(id){
@@ -1071,20 +1194,17 @@ function updateAddBar(){
   }
 }
 
-function addCheckedVasiflar(){
+async function addCheckedVasiflar(){
   if(!_cbChecked.size) return;
-  const list = dbGet('vasiflandirmalar');
-  let added = 0;
-  _cbChecked.forEach(ekipmanId=>{
-    if(!list.find(v=>v.personel_id===_vasifPid && v.ekipman_id===ekipmanId)){
-      list.push({id:nextId(), personel_id:_vasifPid, ekipman_id:ekipmanId});
+  let added=0;
+  for(const ekipmanId of _cbChecked){
+    if(!dbGet('vasiflandirmalar').find(v=>v.personel_id===_vasifPid&&v.ekipman_id===ekipmanId)){
+      await dbAdd('vasiflandirmalar',{personel_id:_vasifPid,ekipman_id:ekipmanId});
       added++;
     }
-  });
-  dbSet('vasiflandirmalar', list);
-  toast(added + ' ekipman eklendi');
-  clearVasifSearch();
-  renderEkipmanCards('v-ekipman-cards', _vasifPid);
+  }
+  toast(added+' ekipman eklendi'); clearVasifSearch();
+  renderEkipmanCards('v-ekipman-cards',_vasifPid);
 }
 
 function clearVasifSearch(){
@@ -1094,10 +1214,9 @@ function clearVasifSearch(){
   document.getElementById('v-add-bar').style.display='none';
 }
 
-function removeVasif(vasifId, pid, container){
+async function removeVasif(vasifId, pid, container){
   if(!confirm('Bu ekipman vasıflandırmadan kaldırılacak. Emin misiniz?')) return;
-  dbSet('vasiflandirmalar', dbGet('vasiflandirmalar').filter(v=>v.id!==vasifId));
-  // Also remove egitim/gozetim for this vasifId
+  await dbDelete('vasiflandirmalar', vasifId);
   renderEkipmanCards(container, pid||_vasifPid);
   toast('Kaldırıldı');
 }
@@ -1225,28 +1344,14 @@ function openBulkEgitimModal(){
 function bulkEgSelectAll(v){
   document.querySelectorAll('#bulk-eg-ekipman-list input[type=checkbox]').forEach(cb=>cb.checked=v);
 }
-function saveBulkEgitim(){
-  const pid = _vasifPid;
-  const secilenler = [...document.querySelectorAll('#bulk-eg-ekipman-list input[type=checkbox]:checked')].map(cb=>parseInt(cb.getAttribute('data-vasif-id')));
-  if(!secilenler.length){ toast('En az bir ekipman seçin','err'); return; }
-  const list = dbGet('egitimler');
-  const base = {
-    tarih:document.getElementById('beg-tarih').value,
-    yer:document.getElementById('beg-yer').value,
-    egitmen:document.getElementById('beg-egitmen').value,
-    vasif_yer:document.getElementById('beg-vasif_yer').value,
-    gozlemci:document.getElementById('beg-gozlemci').value,
-    goz_rapor:document.getElementById('beg-goz_rapor').value,
-    bel_kurul:document.getElementById('beg-bel_kurul').value,
-    atama:document.getElementById('beg-atama').value,
-  };
-  secilenler.forEach(vasifId=>{
-    list.push({id:nextId(), vasif_id:vasifId, personel_id:pid, ...base});
-  });
-  dbSet('egitimler', list);
-  closeModal('m-bulk-egitim');
-  toast(secilenler.length+' ekipmana eğitim eklendi');
-  renderEkipmanCards('v-ekipman-cards', pid);
+async function saveBulkEgitim(){
+  const pid=_vasifPid;
+  const sel=[...document.querySelectorAll('#bulk-eg-ekipman-list input[type=checkbox]:checked')].map(cb=>parseInt(cb.getAttribute('data-vasif-id')));
+  if(!sel.length){toast('En az bir ekipman seçin','err');return;}
+  const base={tarih:document.getElementById('beg-tarih').value,yer:document.getElementById('beg-yer').value,egitmen:document.getElementById('beg-egitmen').value,vasif_yer:document.getElementById('beg-vasif_yer').value,gozlemci:document.getElementById('beg-gozlemci').value,goz_rapor:document.getElementById('beg-goz_rapor').value,bel_kurul:document.getElementById('beg-bel_kurul').value,atama:document.getElementById('beg-atama').value};
+  for(const vasifId of sel) await dbAdd('egitimler',{vasif_id:vasifId,personel_id:pid,...base});
+  closeModal('m-bulk-egitim'); toast(sel.length+' ekipmana eğitim eklendi');
+  renderEkipmanCards('v-ekipman-cards',pid);
 }
 
 // ── Toplu Gözetim ─────────────────────────────────────────────
@@ -1270,24 +1375,14 @@ function openBulkGozModal(){
 function bulkGzSelectAll(v){
   document.querySelectorAll('#bulk-gz-ekipman-list input[type=checkbox]').forEach(cb=>cb.checked=v);
 }
-function saveBulkGoz(){
-  const pid = _vasifPid;
-  const secilenler = [...document.querySelectorAll('#bulk-gz-ekipman-list input[type=checkbox]:checked')].map(cb=>parseInt(cb.getAttribute('data-vasif-id')));
-  if(!secilenler.length){ toast('En az bir ekipman seçin','err'); return; }
-  const list = dbGet('gozetimler');
-  const base = {
-    tarih:document.getElementById('bgz-tarih').value,
-    gozletmen:document.getElementById('bgz-gozletmen').value,
-    rapor_no:document.getElementById('bgz-rapor_no').value,
-    musteri_no:document.getElementById('bgz-musteri_no').value,
-  };
-  secilenler.forEach(vasifId=>{
-    list.push({id:nextId(), vasif_id:vasifId, personel_id:pid, ...base});
-  });
-  dbSet('gozetimler', list);
-  closeModal('m-bulk-goz');
-  toast(secilenler.length+' ekipmana gözetim eklendi');
-  renderEkipmanCards('v-ekipman-cards', pid);
+async function saveBulkGoz(){
+  const pid=_vasifPid;
+  const sel=[...document.querySelectorAll('#bulk-gz-ekipman-list input[type=checkbox]:checked')].map(cb=>parseInt(cb.getAttribute('data-vasif-id')));
+  if(!sel.length){toast('En az bir ekipman seçin','err');return;}
+  const base={tarih:document.getElementById('bgz-tarih').value,gozletmen:document.getElementById('bgz-gozletmen').value,rapor_no:document.getElementById('bgz-rapor_no').value,musteri_no:document.getElementById('bgz-musteri_no').value};
+  for(const vasifId of sel) await dbAdd('gozetimler',{vasif_id:vasifId,personel_id:pid,...base});
+  closeModal('m-bulk-goz'); toast(sel.length+' ekipmana gözetim eklendi');
+  renderEkipmanCards('v-ekipman-cards',pid);
 }
 
 // ── Tekil Eğitim modal (eski m-egitim modal'ı için — artık kullanılmıyor ama modal HTML var) ──
@@ -1297,48 +1392,27 @@ function openEgitimModal(vasifId){
   ['tarih','yer','egitmen','vasif_yer','gozlemci','goz_rapor','bel_kurul','atama'].forEach(f=>{ document.getElementById('eg-'+f).value=''; });
   openModal('m-egitim');
 }
-function saveEgitim(){
-  const pid = parseInt(document.getElementById('d-id').value)||_vasifPid;
-  const e = {
-    id:nextId(), vasif_id:_activeVasifId, personel_id:pid,
-    tarih:document.getElementById('eg-tarih').value,
-    yer:document.getElementById('eg-yer').value,
-    egitmen:document.getElementById('eg-egitmen').value,
-    vasif_yer:document.getElementById('eg-vasif_yer').value,
-    gozlemci:document.getElementById('eg-gozlemci').value,
-    goz_rapor:document.getElementById('eg-goz_rapor').value,
-    bel_kurul:document.getElementById('eg-bel_kurul').value,
-    atama:document.getElementById('eg-atama').value,
-  };
-  const list=dbGet('egitimler'); list.push(e); dbSet('egitimler',list);
-  closeModal('m-egitim'); toast('Eğitim eklendi');
-  refreshEkipCard(_activeVasifId);
-}
-function delEgitimV(id, vasifId){
+async function delEgitimV(id, vasifId){
   if(!confirm('Silinecek. Emin misiniz?')) return;
-  dbSet('egitimler', dbGet('egitimler').filter(e=>e.id!==id));
+  await dbDelete('egitimler', id);
   toast('Silindi'); refreshEkipCard(vasifId);
 }
 
 // ── Gözetim (vasif bağlantılı) ───────────────────────────────
-function addGozV(vasifId){
+async function addGozV(vasifId){
   const pid = _vasifPid || parseInt(document.getElementById('d-id').value);
-  const list=dbGet('gozetimler');
-  list.push({id:nextId(), vasif_id:vasifId, personel_id:pid, tarih:'', gozletmen:'', rapor_no:'', musteri_no:''});
-  dbSet('gozetimler',list); refreshEkipCard(vasifId);
+  await dbAdd('gozetimler', {vasif_id:vasifId, personel_id:pid, tarih:'', gozletmen:'', rapor_no:'', musteri_no:''});
+  refreshEkipCard(vasifId);
 }
-function saveGozV(id, vasifId){
-  const list=dbGet('gozetimler');
-  const idx=list.findIndex(g=>g.id===id); if(idx<0) return;
-  list[idx].tarih=document.getElementById('gzv-t-'+id)?.value||'';
-  list[idx].gozletmen=document.getElementById('gzv-g-'+id)?.value||'';
-  list[idx].rapor_no=document.getElementById('gzv-r-'+id)?.value||'';
-  list[idx].musteri_no=document.getElementById('gzv-m-'+id)?.value||'';
-  dbSet('gozetimler',list); toast('Gözetim kaydedildi');
+async function saveGozV(id, vasifId){
+  const updates={tarih:document.getElementById('gzv-t-'+id)?.value||'',gozletmen:document.getElementById('gzv-g-'+id)?.value||'',rapor_no:document.getElementById('gzv-r-'+id)?.value||'',musteri_no:document.getElementById('gzv-m-'+id)?.value||''};
+  await dbUpdate('gozetimler', id, updates);
+  const g=dbGet('gozetimler').find(x=>x.id===id); if(g) Object.assign(g,updates);
+  toast('Gözetim kaydedildi');
 }
-function delGozV(id, vasifId){
+async function delGozV(id, vasifId){
   if(!confirm('Silinecek?')) return;
-  dbSet('gozetimler',dbGet('gozetimler').filter(g=>g.id!==id));
+  await dbDelete('gozetimler', id);
   toast('Silindi'); refreshEkipCard(vasifId);
 }
 
@@ -1433,11 +1507,7 @@ function importCSV(file){
   reader.readAsText(file, 'UTF-8');
 }
 
-// ══════════════════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════════════════
-initDB();
-showDashboard();
+document.addEventListener("DOMContentLoaded", function(){ initApp(); });
 </script>
 </body>
 </html>
