@@ -140,6 +140,17 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
 .ekip-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .ekip-body{padding:14px 16px;display:none}
 .ekip-body.active{display:block}
+
+/* Gecikme tooltip */
+.gec-tooltip {
+  position:fixed; z-index:9999;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--radius); padding:8px 12px;
+  font-size:12px; color:var(--text);
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+  max-width:320px; pointer-events:none;
+  line-height:1.6;
+}
 </style>
 </head>
 <body>
@@ -189,7 +200,7 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
     <div class="card-header"><span class="card-title">AKM Şubeleri</span></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>ŞUBE ADI</th><th class="text-center">TEKNİK HİZMETLER</th><th class="text-center">ASPK</th><th class="text-center">ÜYE İLİŞKİLERİ</th><th class="text-center">PERSONEL</th><th>İŞLEM</th></tr></thead>
+        <thead><tr><th>ŞUBE ADI</th><th class="text-center">GÖZETİMİ GEÇMİŞ EKİPMAN</th><th class="text-center">PERSONEL</th><th>İŞLEM</th></tr></thead>
         <tbody id="sube-tbody"></tbody>
       </table>
     </div>
@@ -199,30 +210,45 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
 <!-- PAGE: PERSONEL LIST -->
 <div id="page-personel" class="page">
   <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
-    <div>
-      <h2 id="p-title" style="font-size:16px;font-weight:700"></h2>
-      <div class="text-muted text-sm mt-2" id="p-count"></div>
+    <div class="flex items-center gap-3">
+      <button id="p-back-btn" class="btn btn-outline btn-sm" style="display:none" onclick="goto('dashboard')">← Geri</button>
+      <div>
+        <h2 id="p-title" style="font-size:16px;font-weight:700"></h2>
+        <div class="text-muted text-sm mt-2" id="p-count"></div>
+      </div>
     </div>
     <div class="flex gap-2 items-center flex-wrap">
       <div class="search-box" style="position:relative">
         <span class="si">🔍</span>
-        <input class="form-control" id="p-search" placeholder="Ada, TC, sicil no ile ara…" style="width:230px;padding-left:30px" oninput="renderPersonelTable()">
+        <input class="form-control" id="p-search" placeholder="Ada, sicil no ile ara…" style="width:200px;padding-left:30px" oninput="renderPersonelTable()">
       </div>
+      <select class="form-control" id="p-filter-sube" style="width:150px;font-size:12px" onchange="renderPersonelTable()">
+        <option value="">Tüm Şubeler</option>
+      </select>
+      <select class="form-control" id="p-filter-durum" style="width:130px;font-size:12px" onchange="renderPersonelTable()">
+        <option value="">Tüm Durumlar</option>
+        <option value="Aktif">Aktif</option>
+        <option value="Pasif">Pasif</option>
+        <option value="Askıda">Askıda</option>
+      </select>
+      <select class="form-control" id="p-filter-gorev" style="width:170px;font-size:12px" onchange="renderPersonelTable()">
+        <option value="">Tüm Görevler</option>
+        <option value="Muayene Personeli">Muayene Personeli</option>
+        <option value="Birim Sorumlusu">Birim Sorumlusu</option>
+        <option value="Onaylayıcı">Onaylayıcı</option>
+      </select>
       <button class="btn btn-primary btn-sm" onclick="openAddPersonel()">+ Yeni Personel</button>
-      <span id="sel-count" class="text-muted text-sm"></span>
-      <button class="btn btn-outline btn-sm" id="btn-detay" disabled onclick="selAction('detay')">Detay</button>
-      <button class="btn btn-outline btn-sm" id="btn-edit" disabled onclick="selAction('edit')">Düzenle</button>
-      <button class="btn btn-primary btn-sm" id="btn-vasif" disabled onclick="selAction('vasif')">Vasıflandırma</button>
+
     </div>
   </div>
   <div class="card">
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th style="width:34px"></th>
           <th>ADI SOYADI</th><th>İRTİBAT ŞUBE</th><th>TEMSİLCİLİK</th>
-          <th>ODA SİCİL NO</th><th>TC KİMLİK NO</th><th>CEP TEL</th>
-          <th>E-MAİL</th><th>ÇALIŞMA DURUMU</th><th>MESLEĞİ</th><th>KURULUŞTAKİ GÖREVİ</th>
+          <th>ODA SİCİL NO</th><th>CEP TEL</th>
+          <th>E-MAİL</th><th>ÇALIŞMA DURUMU</th><th>KURULUŞTAKİ GÖREVİ</th>
+          <th title="Gözetim gecikmeli ekipman">⚠</th><th></th>
         </tr></thead>
         <tbody id="p-tbody"></tbody>
       </table>
@@ -353,10 +379,10 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
     </div>
   </div>
   <!-- Toplu işlem butonları -->
-  <div id="v-bulk-bar" style="display:none;margin-bottom:14px" class="flex items-center gap-2">
-    <span class="text-muted text-sm" id="v-bulk-info"></span>
-    <button class="btn btn-primary btn-sm" onclick="openBulkEgitimModal()">📚 Eğitim Ekle</button>
-    <button class="btn btn-outline btn-sm" onclick="openBulkGozModal()">👁 Gözetim Ekle</button>
+  <div id="v-bulk-bar" style="display:none"></div>
+  <!-- Özel ekipman ekle -->
+  <div style="margin-bottom:10px">
+    <button class="btn btn-outline btn-sm" onclick="openOzelEkipmanModal()">+ Listede Olmayan Ekipman Ekle</button>
   </div>
   <!-- Ekipman filtre -->
   <div id="v-filter-wrap" style="display:none;margin-bottom:12px">
@@ -518,6 +544,31 @@ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:po
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('m-bulk-goz')">İptal</button>
       <button class="btn btn-primary" onclick="saveBulkGoz()">💾 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Özel Ekipman Ekle -->
+<div class="modal-overlay" id="m-ozel-ekipman">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title">Özel Ekipman Ekle</span>
+      <button class="modal-close" onclick="closeModal('m-ozel-ekipman')">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted text-sm" style="margin-bottom:12px">Listede bulunmayan bir ekipmanı buradan ekleyebilirsiniz.</p>
+      <div class="form-group">
+        <label class="form-label">Ekipman Kodu <span style="color:var(--red)">*</span></label>
+        <input class="form-control" id="oe-kod" placeholder="örn: D39-01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ekipman Adı <span style="color:var(--red)">*</span></label>
+        <input class="form-control" id="oe-ad" placeholder="Ekipmanın tam adı">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('m-ozel-ekipman')">İptal</button>
+      <button class="btn btn-primary" onclick="addOzelEkipman()">Ekle & Vasıflandır</button>
     </div>
   </div>
 </div>
@@ -1005,6 +1056,78 @@ function switchTab(group, tab){
 // ══════════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════════
+
+// ── Gözetim gecikme hesabı ────────────────────────────────────────
+function gozGecikmeVar(vasifId) {
+  // Eğitim atama tarihi veya son gözetim tarihinden 2 yıl geçmiş mi?
+  const today = new Date();
+  const twoYearsMs = 2 * 365.25 * 24 * 3600 * 1000;
+
+  const gzList = dbGet('gozetimler').filter(g => g.vasif_id == vasifId)
+    .filter(g => g.tarih).sort((a,b) => b.tarih.localeCompare(a.tarih));
+  const egList = dbGet('egitimler').filter(e => e.vasif_id == vasifId)
+    .filter(e => e.atama || e.tarih)
+    .sort((a,b) => (b.atama||b.tarih||'').localeCompare(a.atama||a.tarih||''));
+
+  let referans = null;
+  if (gzList.length) {
+    referans = new Date(gzList[0].tarih);
+  } else if (egList.length) {
+    referans = new Date(egList[0].atama || egList[0].tarih);
+  }
+  if (!referans || isNaN(referans)) return false;
+  return (today - referans) > twoYearsMs;
+}
+
+
+
+// Önbellek — her renderPersonelTable çağrısında sıfırlanır
+let _gecikmeCache = null;
+
+function _buildGecikmeCache() {
+  // Tüm veriler bellekte, map olarak hazırla
+  const bugun = new Date();
+  const gozByVasif = {};
+  dbGet('gozetimler').forEach(g=>{ if(g.tarih){ if(!gozByVasif[g.vasif_id]) gozByVasif[g.vasif_id]=[]; gozByVasif[g.vasif_id].push(g.tarih); } });
+  const egByVasif = {};
+  dbGet('egitimler').forEach(e=>{ const t=e.atama||e.tarih; if(t){ if(!egByVasif[e.vasif_id]) egByVasif[e.vasif_id]=[]; egByVasif[e.vasif_id].push(t); } });
+  const cache = {}; // pid -> [{ekipman_id, kod, ad, sonTarih, gecGun}]
+  dbGet('vasiflandirmalar').forEach(v => {
+    const gz = (gozByVasif[v.id]||[]).sort().reverse();
+    const eg = (egByVasif[v.id]||[]).sort().reverse();
+    const ref = gz[0] || eg[0];
+    if(!ref) return;
+    const refDate = new Date(ref);
+    if(isNaN(refDate.getTime())) return;
+    const gecGun = (bugun - refDate) / (1000*60*60*24);
+    if(gecGun > 730) {
+      if(!cache[v.personel_id]) cache[v.personel_id] = [];
+      const e = EKIPMANLAR.find(x=>x.id===v.ekipman_id)||{id:v.ekipman_id,ad:'?'};
+      cache[v.personel_id].push({ekipman_id:v.ekipman_id, ad:e.ad, sonTarih:fmtDate(ref), gecGun:Math.floor(gecGun)});
+    }
+  });
+  return cache;
+}
+
+function kisiGecikmeliEkipmanSayisi(pid) {
+  if(!_gecikmeCache) _gecikmeCache = _buildGecikmeCache();
+  return (_gecikmeCache[pid]||[]).length;
+}
+
+function kisiGecikmeliEkipmanListesi(pid) {
+  if(!_gecikmeCache) _gecikmeCache = _buildGecikmeCache();
+  return _gecikmeCache[pid]||[];
+}
+
+function subeGecikmeSayisi(subeName) {
+  const aktifPersonel = dbGet('personel').filter(p =>
+    p.irtibat_sube === subeName && p.calisma_durumu === 'Aktif'
+  );
+  let toplam = 0;
+  aktifPersonel.forEach(p => { toplam += kisiGecikmeliEkipmanSayisi(p.id); });
+  return toplam;
+}
+
 function showDashboard(){
   document.getElementById('tb-title').textContent='Ana Sayfa';
   document.getElementById('tb-crumb').textContent='AKM Şubeleri';
@@ -1016,11 +1139,15 @@ function showDashboard(){
   const tbody = document.getElementById('sube-tbody');
   tbody.innerHTML = SUBELER.map(s=>{
     const sayisi = personel.filter(p=>p.irtibat_sube===s).length;
+    const gecikme = subeGecikmeSayisi(s);
+    const gecBadge = gecikme > 0
+      ? `<span class="badge badge-red">${gecikme}</span>`
+      : `<span class="badge badge-gray">0</span>`;
     return `<tr>
-      <td><strong>${s}</strong></td>
-      <td class="text-center">-</td>
-      <td class="text-center">-</td>
-      <td class="text-center">-</td>
+      <td style="cursor:pointer" onclick="goto('personel',{sube:'${s}'})" title="${s} personelini göster">
+        <strong style="color:var(--accent)">${s}</strong>
+      </td>
+      <td class="text-center">${gecBadge}</td>
       <td class="text-center"><span class="badge badge-blue">${sayisi}</span></td>
       <td><button class="btn btn-outline btn-xs" onclick="goto('personel',{sube:'${s}'})">Detay →</button></td>
     </tr>`;
@@ -1038,6 +1165,7 @@ function showPersonel(params={}){
   updateSelBtns();
   const title = params.sube || 'Tüm Personel';
   document.getElementById('p-title').textContent = title;
+  const backBtn=document.getElementById('p-back-btn'); if(backBtn) backBtn.style.display=params?.sube?'':'none';
   document.getElementById('tb-title').textContent = 'Personel Listesi';
   document.getElementById('tb-crumb').textContent = title;
   document.getElementById('p-search').value = '';
@@ -1046,31 +1174,48 @@ function showPersonel(params={}){
 }
 
 function renderPersonelTable(){
-  const q = (document.getElementById('p-search')?.value||'').toLowerCase();
+  _gecikmeCache = null; // Önbelleği sıfırla
+  const q      = (document.getElementById('p-search')?.value||'').toLowerCase();
+  const fSube  = document.getElementById('p-filter-sube')?.value||'';
+  const fDurum = document.getElementById('p-filter-durum')?.value||'';
+  const fGorev = document.getElementById('p-filter-gorev')?.value||'';
   let rows = dbGet('personel');
   if(_currentSube) rows = rows.filter(p=>p.irtibat_sube===_currentSube);
-  if(q) rows = rows.filter(p=>
-    (p.adi_soyadi||'').toLowerCase().includes(q)||
-    (p.tc_kimlik_no||'').includes(q)||
-    (p.oda_sicil_no||'').toLowerCase().includes(q)
-  );
+  if(q)      rows = rows.filter(p=>(p.adi_soyadi||'').toLowerCase().includes(q)||(p.oda_sicil_no||'').toLowerCase().includes(q));
+  if(fSube)  rows = rows.filter(p=>p.irtibat_sube===fSube);
+  if(fDurum) rows = rows.filter(p=>p.calisma_durumu===fDurum);
+  if(fGorev) rows = rows.filter(p=>p.kurulusdaki_gorevi===fGorev);
+  // Şube filtresi dropdown'unu doldur (bir kez)
+  const subeEl = document.getElementById('p-filter-sube');
+  if(subeEl && subeEl.options.length<=1){
+    const subeler = [...new Set(dbGet('personel').map(p=>p.irtibat_sube).filter(Boolean))].sort();
+    subeler.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; subeEl.appendChild(o); });
+    if(_currentSube) subeEl.value = _currentSube;
+  }
   document.getElementById('p-count').textContent = rows.length + ' personel';
   const tbody = document.getElementById('p-tbody');
-  if(!rows.length){ tbody.innerHTML='<tr><td colspan="11" class="empty">Personel bulunamadı</td></tr>'; return; }
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">Personel bulunamadı</td></tr>'; return; }
+  rows.sort((a,b)=>{ const o={Aktif:0,Askıda:1,Pasif:2}; return (o[a.calisma_durumu]??3)-(o[b.calisma_durumu]??3); });
   const db = {Aktif:'badge-green',Pasif:'badge-red',Askıda:'badge-yellow',İptal:'badge-red'};
-  tbody.innerHTML = rows.map(p=>`<tr>
-    <td><input type="checkbox" ${_selId===p.id?'checked':''} onchange="selectPersonel(${p.id},this.checked)"></td>
-    <td style="cursor:pointer" onclick="goto('detay',{id:${p.id},mode:'view'})" title="Detaya gitmek için tıklayın"><strong style="color:var(--accent)">${p.adi_soyadi||''}</strong></td>
+  tbody.innerHTML = rows.map(p=>{
+    const gecikme = kisiGecikmeliEkipmanSayisi(p.id);
+    const gecListe = kisiGecikmeliEkipmanListesi(p.id);
+    const gecTip = gecListe.map(x=>x.ad+' ('+x.sonTarih+', '+x.gecGun+' gün)').join('&#10;');
+    const gecBadge = gecikme>0
+      ? `<span class="badge badge-red gec-badge" style="cursor:pointer" data-pid="${p.id}" data-tiptext="${gecTip}">${gecikme}</span>`
+      : `<span class="badge badge-gray">0</span>`;
+    return `<tr style="cursor:pointer" onclick="goto('detay',{id:${p.id},mode:'view'})">
+    <td><strong style="color:var(--accent)">${p.adi_soyadi||''}</strong></td>
     <td class="text-sm">${p.irtibat_sube||'-'}</td>
     <td class="text-sm">${p.temsilcilik||'-'}</td>
     <td class="mono">${p.oda_sicil_no||'-'}</td>
-    <td class="mono">${p.tc_kimlik_no||'-'}</td>
     <td class="text-sm">${p.cep_tel||'-'}</td>
     <td class="text-sm truncate">${p.email||'-'}</td>
     <td><span class="badge ${db[p.calisma_durumu]||'badge-gray'}">${p.calisma_durumu||'-'}</span></td>
-    <td class="text-sm">${p.meslegi||'-'}</td>
     <td><span class="badge badge-gray text-sm">${p.kurulusdaki_gorevi||'-'}</span></td>
-  </tr>`).join('');
+    <td class="text-center" onclick="event.stopPropagation()">${gecBadge}</td>
+    <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-xs" onclick="goto('vasif',{id:${p.id}})">Vasıflandırma</button></td>
+  </tr>`;}).join('');
 }
 
 function selectPersonel(id, checked){
@@ -1096,13 +1241,7 @@ function selectPersonel(id, checked){
   updateSelBtns();
 }
 
-function updateSelBtns(){
-  const has = _selId !== null;
-  document.getElementById('btn-detay').disabled = !has;
-  document.getElementById('btn-edit').disabled = !has;
-  document.getElementById('btn-vasif').disabled = !has;
-  document.getElementById('sel-count').textContent = has ? '1 seçili' : '';
-}
+function updateSelBtns(){ /* butonlar kaldırıldı */ }
 
 function selAction(action){
   if(!_selId){ toast('Önce bir personel seçin','err'); return; }
@@ -1248,7 +1387,8 @@ function openAddEgitim(){
 
 async function saveEgitim(){
   const pid = parseInt(document.getElementById('d-id').value)||_vasifPid;
-  const e = {
+  const editId = document.getElementById('eg-edit-id').value;
+  const data = {
     vasif_id:_activeVasifId, personel_id:pid,
     tarih:document.getElementById('eg-tarih').value,
     yer:document.getElementById('eg-yer').value,
@@ -1259,8 +1399,16 @@ async function saveEgitim(){
     bel_kurul:document.getElementById('eg-bel_kurul').value,
     atama:document.getElementById('eg-atama').value,
   };
-  await dbAdd('egitimler', e);
-  closeModal('m-egitim'); toast('Eğitim eklendi');
+  if(editId){
+    await dbUpdate('egitimler', parseInt(editId), data);
+    const eg = dbGet('egitimler').find(x=>x.id==editId);
+    if(eg) Object.assign(eg, data);
+    toast('Eğitim güncellendi');
+  } else {
+    await dbAdd('egitimler', data);
+    toast('Eğitim eklendi');
+  }
+  closeModal('m-egitim');
   refreshEkipCard(_activeVasifId);
 }
 
@@ -1458,8 +1606,8 @@ function renderEkipmanCards(containerId, pid){
           <td class="text-center"><span class="badge ${gzSay?'badge-blue':'badge-gray'}">${gzSay}</span></td>
           <td class="text-sm">${sonTarih}${sonLabel&&sonHam?' <span style="font-size:10px;color:var(--text2)">('+sonLabel+')</span>':''}</td>
           <td style="white-space:nowrap">
-            <button class="btn btn-outline btn-xs" style="margin-right:4px" onclick="openVasifDetayModal(${v.id})">Detay</button>
-            <button class="btn btn-danger btn-xs" onclick="removeVasif(${v.id},${pid},'d-vasif-cards')">Kaldır</button>
+            <button class="btn btn-outline btn-xs" style="margin-right:4px" data-action="open-vasif-detay" data-vid="${v.id}">Detay</button>
+            <button class="btn btn-danger btn-xs" data-action="remove-vasif" data-vid="${v.id}" data-pid="${pid}" data-cnt="d-vasif-cards">Kaldır</button>
           </td>
         </tr>`;
       }).join('')}</tbody>
@@ -1467,8 +1615,8 @@ function renderEkipmanCards(containerId, pid){
     return;
   }
   // Vasıflandırma sayfasında: kartlar + sekmeler + toplu buton bar
-  const bar = document.getElementById('v-bulk-bar');
-  if(bar){ bar.style.display='flex'; document.getElementById('v-bulk-info').textContent = vasiflar.length+' ekipman'; }
+  // Toplu buton bar devre dışı — her ekipman kartında ayrı buton var
+  // const bar = document.getElementById('v-bulk-bar');
   // Filtre kutusunu göster
   const filterWrap = document.getElementById('v-filter-wrap');
   if(filterWrap) filterWrap.style.display = 'block';
@@ -1491,11 +1639,15 @@ function renderEkipmanCards(containerId, pid){
           <span class="ekip-code">${e.id}</span>
           <span class="ekip-name">${e.ad}</span>
         </div>
-        <button class="btn btn-danger btn-xs" onclick="removeVasif(${v.id},${pid},'${containerId}')">Kaldır</button>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn btn-primary btn-xs" data-action="open-eg-modal" data-vid="${v.id}">+ Eğitim Ekle</button>
+          <button class="btn btn-outline btn-xs" data-action="open-goz-modal" data-vid="${v.id}">+ Gözetim Ekle</button>
+          <button class="btn btn-danger btn-xs" data-action="remove-vasif" data-vid="${v.id}" data-pid="${pid}" data-cnt="${containerId}">Kaldır</button>
+        </div>
       </div>
       <div class="ekip-tabs">
-        <button class="ekip-tab active" onclick="switchEkipTab(${v.id},'egitim')">📚 Eğitim (${egitimler.length})</button>
-        <button class="ekip-tab" onclick="switchEkipTab(${v.id},'gozetim')">👁 Gözetim (${gozetimler.length})</button>
+        <button class="ekip-tab active" data-action="switch-tab" data-vid="${v.id}" data-tab="egitim">📚 Eğitim (${egitimler.length})</button>
+        <button class="ekip-tab" data-action="switch-tab" data-vid="${v.id}" data-tab="gozetim">👁 Gözetim (${gozetimler.length})</button>
       </div>
       <div class="ekip-body active" id="ekip-egitim-${v.id}">
         ${renderEgitimBody(v.id, egitimler)}
@@ -1519,37 +1671,66 @@ function switchEkipTab(vasifId, tab){
 function renderEgitimBody(vasifId, rows){
   const tableRows = rows.length
     ? rows.map(e=>`<tr>
-        <td class="mono">${e.tarih||'-'}</td>
+        <td class="mono">${fmtDate(e.tarih)||'-'}</td>
         <td>${e.yer||'-'}</td>
         <td>${e.egitmen||'-'}</td>
         <td>${e.vasif_yer||'-'}</td>
         <td>${e.gozlemci||'-'}</td>
-        <td class="mono">${e.goz_rapor||'-'}</td>
-        <td class="mono">${e.bel_kurul||'-'}</td>
-        <td class="mono">${e.atama||'-'}</td>
-        <td><button class="btn btn-danger btn-xs" onclick="delEgitimV(${e.id},${vasifId})">Sil</button></td>
+        <td class="mono">${fmtDate(e.goz_rapor)||'-'}</td>
+        <td class="mono">${fmtDate(e.bel_kurul)||'-'}</td>
+        <td class="mono">${fmtDate(e.atama)||'-'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-outline btn-xs" style="margin-right:3px" data-action="edit-eg" data-eid="${e.id}" data-vid="${vasifId}">Düzenle</button>
+          <button class="btn btn-danger btn-xs" data-action="del-eg" data-eid="${e.id}" data-vid="${vasifId}">Sil</button>
+        </td>
       </tr>`).join('')
-    : '<tr><td colspan="9" class="empty" style="padding:12px">Kayıt yok — yukarıdan "Eğitim Ekle" ile ekleyin</td></tr>';
-  return `<div class="text-muted text-sm mb-2">Eğitim kayıtları</div>
-  <div class="table-wrap"><table>
+    : '<tr><td colspan="9" class="empty" style="padding:12px">Henüz eğitim kaydı yok</td></tr>';
+  return `<div class="table-wrap"><table>
     <thead><tr><th>TARİH</th><th>ALINAN YER</th><th>EĞİTMEN</th><th>VASIFLANDİRILAN YER</th><th>GÖZLEMCİ</th><th>GÖZ.RAPOR</th><th>BEL.KURUL</th><th>ATAMA</th><th></th></tr></thead>
     <tbody>${tableRows}</tbody>
   </table></div>`;
 }
 
 function renderGozetimBody(vasifId, rows){
-  const cards = rows.map(g=>`<div class="goz-card">
-    <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
-      <button class="btn btn-outline btn-xs" onclick="saveGozV(${g.id},${vasifId})">Kaydet</button>
-      <button class="btn btn-danger btn-xs" onclick="delGozV(${g.id},${vasifId})">Sil</button>
+  // Tarih sıralaması: en yeni üstte
+  const sorted = [...rows].sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+  const cards = sorted.map(g=>`<div class="goz-card" id="goz-card-${g.id}">
+    <div class="goz-card-view" id="goz-view-${g.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${fmtDate(g.tarih)||'-'}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">${g.gozletmen||'-'}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn btn-outline btn-xs" data-action="start-edit-goz" data-eid="${g.id}" data-vid="${vasifId}">Düzenle</button>
+          <button class="btn btn-danger btn-xs" data-action="del-goz" data-eid="${g.id}" data-vid="${vasifId}">Sil</button>
+        </div>
+      </div>
+      ${g.rapor_no ? `<div style="font-size:11px;color:var(--text2)">Rapor: ${g.rapor_no}</div>` : ''}
+      ${g.musteri_no ? `<div style="font-size:11px;color:var(--text2)">Müşteri: ${g.musteri_no}</div>` : ''}
     </div>
-    <div class="goz-field"><label>TARİH</label><input class="form-control" type="date" id="gzv-t-${g.id}" value="${g.tarih||''}"></div>
-    <div class="goz-field"><label>GÖZETMEN</label><input class="form-control" id="gzv-g-${g.id}" value="${g.gozletmen||''}"></div>
-    <div class="goz-field"><label>RAPOR NO</label><input class="form-control" id="gzv-r-${g.id}" value="${g.rapor_no||''}"></div>
-    <div class="goz-field"><label>MÜŞTERİ NO</label><input class="form-control" id="gzv-m-${g.id}" value="${g.musteri_no||''}"></div>
+    <div class="goz-card-edit" id="goz-edit-${g.id}" style="display:none">
+      <div class="goz-field"><label>TARİH</label><input class="form-control" type="date" id="gzv-t-${g.id}" value="${g.tarih||''}"></div>
+      <div class="goz-field"><label>GÖZETMEN</label><input class="form-control" id="gzv-g-${g.id}" value="${g.gozletmen||''}"></div>
+      <div class="goz-field"><label>RAPOR NO</label><input class="form-control" id="gzv-r-${g.id}" value="${g.rapor_no||''}"></div>
+      <div class="goz-field"><label>MÜŞTERİ NO</label><input class="form-control" id="gzv-m-${g.id}" value="${g.musteri_no||''}"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-primary btn-xs" style="flex:1" data-action="save-goz" data-eid="${g.id}" data-vid="${vasifId}">Kaydet</button>
+        <button class="btn btn-outline btn-xs" data-action="cancel-edit-goz" data-eid="${g.id}">İptal</button>
+      </div>
+    </div>
   </div>`).join('');
-  return `<div class="text-muted text-sm mb-2">Gözetim kayıtları — yukarıdan "Gözetim Ekle" ile ekleyin</div>
-  <div class="goz-grid">${cards || '<div class="empty" style="padding:12px">Kayıt yok</div>'}</div>`;
+
+  return `<div class="goz-grid">${cards || '<div class="empty" style="padding:12px">Henüz gözetim kaydı yok</div>'}</div>`;
+}
+
+function startEditGoz(id, vasifId){
+  document.getElementById('goz-view-'+id).style.display='none';
+  document.getElementById('goz-edit-'+id).style.display='block';
+}
+function cancelEditGoz(id){
+  document.getElementById('goz-view-'+id).style.display='block';
+  document.getElementById('goz-edit-'+id).style.display='none';
 }
 
 // ── Toplu Eğitim ─────────────────────────────────────────────
@@ -1616,10 +1797,26 @@ async function saveBulkGoz(){
 
 // ── Tekil Eğitim modal (eski m-egitim modal'ı için — artık kullanılmıyor ama modal HTML var) ──
 let _activeVasifId = null;
-function openEgitimModal(vasifId){
+function openEgitimModal(vasifId, editId){
   _activeVasifId = vasifId;
-  ['tarih','yer','egitmen','vasif_yer','gozlemci','goz_rapor','bel_kurul','atama'].forEach(f=>{ document.getElementById('eg-'+f).value=''; });
+  // Formu temizle
+  ['eg-tarih','eg-yer','eg-egitmen','eg-vasif_yer','eg-gozlemci','eg-goz_rapor','eg-bel_kurul','eg-atama'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('eg-edit-id').value = editId||'';
+  document.getElementById('m-egitim-title').textContent = editId ? 'Eğitim Düzenle' : 'Eğitim Ekle';
+  if(editId){
+    const eg = dbGet('egitimler').find(x=>x.id==editId);
+    if(eg){
+      ['tarih','yer','egitmen','vasif_yer','gozlemci','goz_rapor','bel_kurul','atama'].forEach(f=>{
+        const el=document.getElementById('eg-'+f); if(el) el.value=eg[f]||'';
+      });
+    }
+  }
   openModal('m-egitim');
+}
+function openEditEgitim(editId, vasifId){
+  openEgitimModal(vasifId, editId);
 }
 async function delEgitimV(id, vasifId){
   if(!confirm('Silinecek. Emin misiniz?')) return;
@@ -1696,10 +1893,11 @@ function openVasifDetayModal(vasifId) {
   const gzRows = gzList.length
     ? gzList.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||'')).map(g=>`<tr>
         <td class="text-sm">${fmtDate(g.tarih)||'-'}</td>
+        <td>${g.gozletmen||'-'}</td>
         <td>${g.rapor_no||'-'}</td>
         <td>${g.musteri_no||'-'}</td>
       </tr>`).join('')
-    : '<tr><td colspan="3" class="empty" style="padding:10px">Gözetim kaydı yok</td></tr>';
+    : '<tr><td colspan="4" class="empty" style="padding:10px">Gözetim kaydı yok</td></tr>';
 
   // Modal içeriği
   const modal = document.getElementById('m-vasif-detay');
@@ -1715,11 +1913,127 @@ function openVasifDetayModal(vasifId) {
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">👁 GÖZETİM KAYITLARI</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>TARİH</th><th>RAPOR NO</th><th>MÜŞTERİ NO</th></tr></thead>
+        <thead><tr><th>TARİH</th><th>GÖZETMEN</th><th>RAPOR NO</th><th>MÜŞTERİ NO</th></tr></thead>
         <tbody>${gzRows}</tbody>
       </table></div>
     </div>`;
   openModal('m-vasif-detay');
+}
+
+// ── Gözetim Ekleme Modal ──────────────────────────────────────────
+function openAddGozModal(vasifId) {
+  _activeVasifId = vasifId;
+  document.getElementById('agz-tarih').value = '';
+  document.getElementById('agz-rapor').value = '';
+  document.getElementById('agz-musteri').value = '';
+
+  // Gözetmen dropdown: bu ekipmanda yetkisi olan personel + son gözetim tarihi
+  const vasif = dbGet('vasiflandirmalar').find(v=>v.id==vasifId);
+  const ekipmanId = vasif?.ekipman_id;
+  const dropdown = document.getElementById('agz-gozletmen-wrap');
+
+  let dropdownHTML = '<input class="form-control" id="agz-gozletmen" placeholder="Gözetmen adı soyadı">';
+
+  if(ekipmanId) {
+    // Bu ekipmanla vasıflı tüm aktif personeli bul
+    const ilgiliVasiflar = dbGet('vasiflandirmalar').filter(v=>v.ekipman_id===ekipmanId);
+    const oneriPersonel = [];
+    ilgiliVasiflar.forEach(v => {
+      const p = dbGet('personel').find(x=>x.id==v.personel_id);
+      if(!p || p.calisma_durumu!=='Aktif') return;
+      // Son gözetim tarihi
+      const sonGoz = dbGet('gozetimler').filter(g=>g.vasif_id==v.id && g.tarih)
+        .sort((a,b)=>b.tarih.localeCompare(a.tarih))[0];
+      oneriPersonel.push({
+        ad: p.adi_soyadi,
+        sonTarih: sonGoz ? fmtDate(sonGoz.tarih) : 'Gözetim yok'
+      });
+    });
+    oneriPersonel.sort((a,b)=>a.ad.localeCompare(b.ad,'tr'));
+
+    if(oneriPersonel.length) {
+      const opts = oneriPersonel.map(p=>
+        `<option value="${p.ad}">${p.ad} (Son: ${p.sonTarih})</option>`
+      ).join('');
+      dropdownHTML = `<select class="form-control" id="agz-gozletmen">
+        <option value="">— Gözetmen seçin —</option>
+        ${opts}
+        <option value="__diger__">Diğer (elle gir)</option>
+      </select>
+      <input class="form-control" id="agz-gozletmen-text" placeholder="Gözetmen adı soyadı" style="display:none;margin-top:6px">`;
+    }
+  }
+
+  dropdown.innerHTML = dropdownHTML;
+
+  // Dropdown'da "Diğer" seçilince text input göster
+  setTimeout(()=>{
+    const sel = document.getElementById('agz-gozletmen');
+    if(sel && sel.tagName==='SELECT'){
+      sel.addEventListener('change', function(){
+        const txt = document.getElementById('agz-gozletmen-text');
+        if(this.value==='__diger__'){ txt.style.display='block'; }
+        else { txt.style.display='none'; }
+      });
+    }
+  }, 50);
+
+  openModal('m-add-goz');
+}
+
+async function saveAddGoz() {
+  const tarih = document.getElementById('agz-tarih').value;
+  if(!tarih){ toast('Tarih zorunlu','err'); return; }
+
+  let gozletmen = '';
+  const sel = document.getElementById('agz-gozletmen');
+  if(sel && sel.tagName==='SELECT'){
+    gozletmen = sel.value==='__diger__'
+      ? (document.getElementById('agz-gozletmen-text')?.value||'')
+      : sel.value;
+  } else {
+    gozletmen = sel?.value||'';
+  }
+
+  const pid = _vasifPid || parseInt(document.getElementById('d-id').value);
+  await dbAdd('gozetimler', {
+    vasif_id: _activeVasifId,
+    personel_id: pid,
+    tarih: tarih,
+    gozletmen: gozletmen,
+    rapor_no: document.getElementById('agz-rapor').value,
+    musteri_no: document.getElementById('agz-musteri').value,
+  });
+  closeModal('m-add-goz');
+  toast('Gözetim eklendi');
+  refreshEkipCard(_activeVasifId);
+}
+
+// ── Özel Ekipman Ekle ────────────────────────────────────────
+function openOzelEkipmanModal() {
+  document.getElementById('oe-kod').value = '';
+  document.getElementById('oe-ad').value = '';
+  openModal('m-ozel-ekipman');
+}
+
+async function addOzelEkipman() {
+  const kod = document.getElementById('oe-kod').value.trim().toUpperCase();
+  const ad  = document.getElementById('oe-ad').value.trim();
+  if(!kod || !ad) { toast('Kod ve ad zorunlu','err'); return; }
+  // Sistemde var mı kontrol et
+  if(EKIPMANLAR.find(e=>e.id===kod)) {
+    toast('Bu kod zaten mevcut: '+kod,'err'); return;
+  }
+  // EKIPMANLAR listesine runtime ekle
+  EKIPMANLAR.push({id:kod, ad:ad});
+  // Personele vasıf olarak ekle
+  const yeniV = {personel_id: _vasifPid, ekipman_id: kod};
+  const saved = await dbAdd('vasiflandirmalar', yeniV);
+  if(saved) {
+    toast(kod+' eklendi','ok');
+    closeModal('m-ozel-ekipman');
+    renderEkipmanCards('v-ekipman-cards', _vasifPid);
+  }
 }
 
 function renderDetayVasiflar(){
@@ -1805,12 +2119,61 @@ document.addEventListener("DOMContentLoaded", function(){
 });
 
 // ── Event delegation ─────────────────────────────────────────
-// vasifSearch input (yeni ekipman arama)
+// vasifSearch input
 document.addEventListener('input', function(e){
   if(e.target.id === 'v-search') vasifSearch(e.target.value);
-  // Eklenen ekipmanları filtrele
   if(e.target.id === 'v-filter') renderEkipmanCards('v-ekipman-cards', _vasifPid);
 });
+
+// Buton tıklamaları için global delegation
+// (file:// protokolünde inline onclick bazen çalışmaz)
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const action = btn.getAttribute('data-action');
+  const vid    = parseInt(btn.getAttribute('data-vid')||'0');
+  const eid    = parseInt(btn.getAttribute('data-eid')||'0');
+  const pid    = parseInt(btn.getAttribute('data-pid')||'0');
+  const cnt    = btn.getAttribute('data-cnt')||'';
+  if(action==='open-eg-modal')    openEgitimModal(vid);
+  if(action==='open-goz-modal')   openAddGozModal(vid);
+  if(action==='remove-vasif')     removeVasif(vid, pid, cnt);
+  if(action==='edit-eg')          openEgitimModal(vid, eid);
+  if(action==='del-eg')           delEgitimV(eid, vid);
+  if(action==='start-edit-goz')   startEditGoz(eid, vid);
+  if(action==='del-goz')          delGozV(eid, vid);
+  if(action==='save-goz')         saveGozV(eid, vid);
+  if(action==='cancel-edit-goz')  cancelEditGoz(eid);
+  if(action==='switch-tab'){ const tab=btn.getAttribute('data-tab'); switchEkipTab(vid,tab); }
+  if(action==='open-vasif-detay') openVasifDetayModal(vid);
+  if(action==='open-ekip-detay') openEkipDetay(vid,pid);
+});
+
+
+// ── Gecikme tooltip ─────────────────────────────────────────
+(function(){
+  let tip = null;
+  document.addEventListener('mouseover', function(e){
+    const badge = e.target.closest('.gec-badge');
+    if(!badge) return;
+    const lines = (badge.getAttribute('data-tiptext')||'').split('&#10;').filter(Boolean);
+    if(!lines.length) return;
+    if(!tip){ tip = document.createElement('div'); tip.className='gec-tooltip'; document.body.appendChild(tip); }
+    tip.innerHTML = '<strong style="font-size:11px;color:var(--text2)">GECİKMELİ EKİPMANLAR</strong><br>' +
+      lines.map(l=>'• '+l).join('<br>');
+    tip.style.display = 'block';
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!tip || tip.style.display==='none') return;
+    const x = e.clientX + 14, y = e.clientY + 14;
+    tip.style.left = Math.min(x, window.innerWidth-330)+'px';
+    tip.style.top  = Math.min(y, window.innerHeight-200)+'px';
+  });
+  document.addEventListener('mouseout', function(e){
+    const badge = e.target.closest('.gec-badge');
+    if(badge && tip) tip.style.display='none';
+  });
+})();
 
 // v-cb-list checkbox change (inline onchange çalışmıyor, delegation kullan)
 document.addEventListener('change', function(e){
